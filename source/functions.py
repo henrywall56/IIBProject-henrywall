@@ -130,11 +130,12 @@ def add_noise(signal, snr_db, sps, Modbits):
 
     snr = 10 ** (snr_db / 10) #dB to linear (10 since power)
 
-    power = np.sqrt(np.mean(abs(signal)**2))*sps/(2*Modbits)
+    stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
 
-    noise_power = power / snr
+    
 
-    noise = noise_power * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
+    noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
+
 
     return signal + noise 
 
