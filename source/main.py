@@ -2,13 +2,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 import functions as f
 
+"""
+TO DO:
+    -probatilistic shaping
+        -where does it come in (tx and rx)
+        -how to implement
+    -FPGA?
+"""
+"""
+1) Generate random bits.
+2) Generate QAM symbols from bits.
+3) Upsampling by inserting zeros.
+4) Pulse shaping with RRC. 
+5) Add circular Gaussian noise.
+6) Matched RRC filter.
+7) Downsample.
+8) Max Likelihood Decision on constellation.
+9) Generate SER.
+10) Decode symbols to bits.
+11) Generate BER.
 
-#TO DO:
-#   64QAM : generation, demod_symbols, decode_bits
-#   probatilistic shaping
-#   why is there always a couple of symbol errors? 
+"""
 def main():
-    num_symbols = 10000
+    num_symbols = 100000
     Modbits = 6 #4 if 16QAM, 6 is 64QAM
 
     #Generate RRC filter impulse response
@@ -35,7 +51,7 @@ def main():
     #Pulse shaping with RRC filter
     tx = f.pulseshaping(symbols, sps, RRCimpulse)
 
-    snr_db = np.arange(6,16,1)
+    snr_db = np.arange(10,20,1)
 
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
     axs1 = axs1.flatten()  # Flatten the array for easy indexing
