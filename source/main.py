@@ -5,7 +5,11 @@ import functions as f
 """
 TO DO:
     -probatilistic shaping
-        -where does it come in (tx and rx)
+        -where does it come in (tx and rx) - papers been sent
+            - https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8640810&tag=1
+            - https://www.nowpublishers.com/article/DownloadSummary/CIT-111
+            - https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7322261
+            -CCDM
         -how to implement
     -FPGA?
 """
@@ -24,8 +28,8 @@ TO DO:
 
 """
 def main():
-    num_symbols = 100000
-    Modbits = 6 #4 if 16QAM, 6 is 64QAM
+    num_symbols = 10000
+    Modbits = 4 #4 if 16QAM, 6 is 64QAM
 
     #Generate RRC filter impulse response
     span= 20 #Span of filter
@@ -51,7 +55,8 @@ def main():
     #Pulse shaping with RRC filter
     tx = f.pulseshaping(symbols, sps, RRCimpulse)
 
-    snr_db = np.arange(10,20,1)
+    snr_begin = 4
+    snr_db = np.arange(snr_begin,snr_begin+10,1)
 
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
     axs1 = axs1.flatten()  # Flatten the array for easy indexing
@@ -85,14 +90,14 @@ def main():
     axs2 = axs2.flatten()  # Flatten the array for easy indexing
     # Plot SER
     axs2[0].semilogy(snr_db, SER, marker='o')
-    axs2[0].set_xlabel('SNR / dB')
+    axs2[0].set_xlabel('SNR per bit/ dB')
     axs2[0].set_ylabel('SER')
     axs2[0].set_title('Symbol Error Rate (SER)')
     axs2[0].grid(True)
 
     # Plot BER
     axs2[1].semilogy(snr_db, BER, marker='o')
-    axs2[1].set_xlabel('SNR / dB')
+    axs2[1].set_xlabel('SNR per bit/ dB')
     axs2[1].set_ylabel('BER')
     axs2[1].set_title('Bit Error Rate (BER)')
     axs2[1].grid(True)
@@ -121,9 +126,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-#TO DO:
-
-#understand how the oversampling work properly
-#how to do raised root cosine pulse shaping
