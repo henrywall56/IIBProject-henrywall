@@ -11,6 +11,8 @@ TO DO:
             - https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7322261
             -CCDM
         -how to implement
+
+    -toggle in code for RRC & matched filter or not (with sps set to 1)
     -FPGA?
 """
 """
@@ -29,12 +31,17 @@ TO DO:
 """
 def main():
     num_symbols = 10000
-    Modbits = 4 #4 if 16QAM, 6 is 64QAM
+    Modbits = 6 #4 if 16QAM, 6 is 64QAM
 
     #Generate RRC filter impulse response
     span= 20 #Span of filter
     sps= 16 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
+
+    toggle_RRC = True #true means on 
+
+    if(toggle_RRC==False):
+        sps=1               #overwrite sps if no RRC
 
     original_bits = np.random.randint(0, 2, size=num_symbols * Modbits)  
 
@@ -45,17 +52,22 @@ def main():
     elif(Modbits==6): #64QAM
         symbols = f.generate_64qam_symbols(original_bits) 
         plotsize = 1.5
+    
+    if(toggle_RRC):
 
-    RRCimpulse , t1 = f.RRC(span, rolloff, sps)
+        RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
-    plt.plot(t1, RRCimpulse, '.')
-    plt.title('RRC Filter Impulse Reponse')
-    plt.show()
+        plt.plot(t1, RRCimpulse, '.')
+        plt.title('RRC Filter Impulse Reponse')
+        plt.show()
 
-    #Pulse shaping with RRC filter
-    tx = f.pulseshaping(symbols, sps, RRCimpulse)
+        #Pulse shaping with RRC filter
+        tx = f.pulseshaping(symbols, sps, RRCimpulse)
 
-    snr_begin = 4
+    else:
+        tx = symbols
+
+    snr_begin = 10
     snr_db = np.arange(snr_begin,snr_begin+10,1)
 
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
@@ -68,9 +80,15 @@ def main():
 
         rx = f.add_noise(tx, snr_dbi, sps, Modbits)
 
-        filtered_signal = f.matched_filter(rx, RRCimpulse)
+        if(toggle_RRC):
 
-        downsampled_rx = f.downsample(filtered_signal, sps)
+            filtered_signal = f.matched_filter(rx, RRCimpulse)
+
+            downsampled_rx = f.downsample(filtered_signal, sps)
+        
+        else:
+            downsampled_rx = rx
+
         # Plot downsampled received constellation
         if(i%3==0):
             f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
