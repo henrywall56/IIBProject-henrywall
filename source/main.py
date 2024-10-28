@@ -76,6 +76,8 @@ def main():
     BER = np.zeros(len(snr_db))
     SER = np.empty(len(snr_db))
 
+    symbol_errors = np.empty(0)
+
     for i, snr_dbi in enumerate(snr_db):
 
         rx = f.add_noise(tx, snr_dbi, sps, Modbits)
@@ -89,17 +91,25 @@ def main():
         else:
             downsampled_rx = rx
 
-        # Plot downsampled received constellation
-        if(i%3==0):
-            f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
+        
 
         demod_symbols = f.max_likelihood_decision(downsampled_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
+
+        # Find erroneous symbol indexes
+        erroneous_indexes = np.where(symbols != demod_symbols)[0]
 
         SER[i] = np.mean(symbols != demod_symbols)
     
         demod_bits = f.decode_symbols(demod_symbols, Modbits) #pass in Modbits which says 16QAM or 64QAM
 
         BER[i] = np.mean(original_bits != demod_bits)
+
+        # Plot downsampled received constellation, including different colour for erroneous results
+        #Only plot some of the results:
+        if(i%3==0):
+            f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
+                    # Highlight erroneous symbols
+            axs1[i//3].scatter(downsampled_rx[erroneous_indexes].real, downsampled_rx[erroneous_indexes].imag, color='red', label='Errors', alpha=0.5)
         
     plt.tight_layout()
     plt.show()
