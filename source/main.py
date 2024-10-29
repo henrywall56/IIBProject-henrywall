@@ -33,12 +33,14 @@ def main():
     num_symbols = 10000
     Modbits = 6 #4 if 16QAM, 6 is 64QAM
 
+
     #Generate RRC filter impulse response
+    #base 20, 16, 0.1
     span= 20 #Span of filter
     sps= 16 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
 
-    toggle_RRC = True #true means on 
+    toggle_RRC = False #true means on 
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -76,7 +78,7 @@ def main():
     BER = np.zeros(len(snr_db))
     SER = np.empty(len(snr_db))
 
-    symbol_errors = np.empty(0)
+    
 
     for i, snr_dbi in enumerate(snr_db):
 
@@ -97,6 +99,8 @@ def main():
 
         # Find erroneous symbol indexes
         erroneous_indexes = np.where(symbols != demod_symbols)[0]
+
+        #print(erroneous_indexes) #plot where errors are
 
         SER[i] = np.mean(symbols != demod_symbols)
     
