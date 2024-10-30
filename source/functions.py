@@ -1,10 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import convolve #upfirdn for up/down sampling
+import time
 
 #References: Digital Coherent Optical Systems Textbook, Matlab Code, page 38
 
+enable_benchmark = True  #True turns on benchmarking
+def benchmark(enabled=enable_benchmark):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            if enabled:
+                start_time = time.time()
+                result = func(*args, **kwargs)
+                end_time = time.time()
+                print(f"Function '{func.__name__}' took {end_time - start_time:.6f} seconds to complete.")
+                return result
+            else:
+                return func(*args, **kwargs)  # Call the function without timing
+        return wrapper
+    return decorator
 
+@benchmark(enable_benchmark)
 def generate_16qam_symbols(bits):
     # 16QAM is 4 bits/symbol, so create array of blocks of 4 bits
     # Mapping dictionary for 16QAM symbols
@@ -31,7 +47,8 @@ def generate_16qam_symbols(bits):
         symbol_mapping[tuple(bits[i:i + 4])] for i in range(0, len(bits), 4)
     ])
     return symbols/np.sqrt(10)
-        
+
+@benchmark(enable_benchmark)
 def generate_64qam_symbols(bits):
     # 64QAM is 6 bits/symbol, so create array of blocks of 6 bits
     # Mapping dictionary for 64QAM symbols
@@ -107,21 +124,25 @@ def generate_64qam_symbols(bits):
     ])
     return symbols/np.sqrt(42)    
 
-def pulseshaping(symbols, sps, RRCimpulse):
+@benchmark(enable_benchmark)
+def pulseshaping(symbols, sps, RRCimpulse, toggle):
     #performs pulse shaping of symbols with RRC filter. 
     #filter parameters are span and rolloff
     #sequence of symbols upsampled to sps samples per symbol then applied RRC filter
-    
-    #upsample the symbols by inserting (sps-1) zeros between each symbol
-    upsampled = np.zeros(sps*len(symbols), dtype=complex)
-    for i in range(0, sps*len(symbols), sps):
-        upsampled[i] = symbols[i//sps]
+    if(toggle==True):
+        #upsample the symbols by inserting (sps-1) zeros between each symbol
+        upsampled = np.zeros(sps*len(symbols), dtype=complex)
+        for i in range(0, sps*len(symbols), sps):
+            upsampled[i] = symbols[i//sps]
 
-    shaped = convolve(upsampled, RRCimpulse, mode='same')
-    shaped = shaped/(np.sqrt(np.mean(abs(shaped)**2)))
+        shaped = convolve(upsampled, RRCimpulse, mode='same')
+        shaped = shaped/(np.sqrt(np.mean(abs(shaped)**2)))
 
-    return shaped
+        return shaped
+    else:
+        return symbols
 
+@benchmark(enable_benchmark)
 def add_noise(signal, snr_db, sps, Modbits): 
     #addition of circular Gaussian noise to transmitted signal
     #snr_db snr per bit in dB in transmitted signal
@@ -139,14 +160,19 @@ def add_noise(signal, snr_db, sps, Modbits):
 
     return signal + noise 
 
-def matched_filter(signal, pulse_shape):
+@benchmark(enable_benchmark)
+def matched_filter(signal, pulse_shape, toggle):
     #received_signal is original signals + noise
     #pulse shape eg raised-root-cosine, square etc.
-    filtered = convolve(signal, pulse_shape, mode='same') 
-    filtered = filtered/(np.sqrt(np.mean(abs(filtered)**2)))
-    #should have peaks where received signal matches pulse shape, maximising SNR
-    return filtered
+    if(toggle==True):
+        filtered = convolve(signal, pulse_shape, mode='same') 
+        filtered = filtered/(np.sqrt(np.mean(abs(filtered)**2)))
+        #should have peaks where received signal matches pulse shape, maximising SNR
+        return filtered
+    else:
+        return signal
 
+@benchmark(enable_benchmark)
 def plot_constellation(ax, symbols, title, lim=2):
     ax.scatter(symbols.real, symbols.imag, color='blue', alpha=0.5)
     ax.set_title(title)
@@ -158,11 +184,16 @@ def plot_constellation(ax, symbols, title, lim=2):
     ax.axhline(0, color='black', lw=0.5)
     ax.axvline(0, color='black', lw=0.5)
 
-def downsample(signal, sps):
-    #downsample a signal that has sps samples per symbol
-    downsampled = signal[::sps]
-    return downsampled
-
+@benchmark(enable_benchmark)
+def downsample(signal, sps, toggle):
+    if(toggle==True):
+        #downsample a signal that has sps samples per symbol
+        downsampled = signal[::sps]
+        return downsampled
+    else:
+        return signal
+    
+@benchmark(enable_benchmark)
 def RRC(span, rolloff, sps):
     #Generate root-raised cosine impulse response
     g = np.zeros(span*sps+1, dtype=float)
@@ -189,6 +220,7 @@ def RRC(span, rolloff, sps):
     t = np.arange(-span * sps / 2, span * sps / 2 + 1)
     return g , t
 
+@benchmark(enable_benchmark)
 def max_likelihood_decision(rx_symbols, Modbits):
     #returns the closest symbols in the constellation to the inputed rx_symbols
     # Define the 16QAM constellation points
@@ -230,6 +262,7 @@ def max_likelihood_decision(rx_symbols, Modbits):
     # Return the detected symbols based on the index
     return ML_symbols
 
+@benchmark(enable_benchmark)
 def decode_symbols(symbols, Modbits):
     #turns symbols back to bitstream
     if(Modbits==4): #16QAM
@@ -329,3 +362,35 @@ def decode_symbols(symbols, Modbits):
     for i, symbol in enumerate(symbols):
         bits[i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(symbol.real*np.sqrt(root))+int(symbol.imag*np.sqrt(root))*1j] #bit stream
     return bits
+
+@benchmark(enable_benchmark)
+def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, plot_phasenoise, toggle):
+    #This function adds phase noise to the transmitted symbols, modelled by a Wiener Process.
+
+    #symbols: symbols sent
+    #sps: samples per symbol
+    #Rs: symbol rate symbols/second
+    #Nsymb: number of transmitted symbols
+    #Linewidth: Laser linewidth in Hz 
+    if(Linewidth != 0 and toggle==True):
+
+        T = 1/(sps*Rs) #period between samples at the oversampled transmit signal
+
+        #Calculating phase noise:
+        Var = 2*np.pi*Linewidth*T           
+        delta_theta = np.sqrt(Var)*np.random.randn(sps*Nsymb)
+        theta = np.cumsum(delta_theta) #an array of phase shift vs time
+        symbols *= np.exp(1j * theta)
+
+        if(plot_phasenoise):            #plotting phase noise
+            t = np.arange(0,len(theta))
+            plt.plot(t, theta)
+            plt.xlabel("Time")
+            plt.ylabel("Phase Noise")
+            plt.title("Phase Noise")
+            plt.show()
+
+        return symbols
+    else:
+        return symbols
+    
