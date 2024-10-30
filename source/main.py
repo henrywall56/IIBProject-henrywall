@@ -33,6 +33,9 @@ def main():
     num_symbols = 10000
     Modbits = 6 #4 if 16QAM, 6 is 64QAM
 
+    #base 
+    Rs = 1000000#Symbol rate in symbols/second
+    Linewidth = 1000#Linewidth of laser in Hz
 
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
@@ -40,12 +43,15 @@ def main():
     sps= 16 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
 
-    toggle_RRC = False #true means on 
+    toggle_RRC = True #true means on
+    toggle_phasenoise = False  #true means on
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
 
+
     original_bits = np.random.randint(0, 2, size=num_symbols * Modbits)  
+
 
     # Generate symbols
     if(Modbits==4): #16QAM
@@ -55,19 +61,18 @@ def main():
         symbols = f.generate_64qam_symbols(original_bits) 
         plotsize = 1.5
     
+    
+
+    RRCimpulse , t1 = f.RRC(span, rolloff, sps)
+
     if(toggle_RRC):
-
-        RRCimpulse , t1 = f.RRC(span, rolloff, sps)
-
         plt.plot(t1, RRCimpulse, '.')
         plt.title('RRC Filter Impulse Reponse')
         plt.show()
 
         #Pulse shaping with RRC filter
-        tx = f.pulseshaping(symbols, sps, RRCimpulse)
+    tx = f.pulseshaping(symbols, sps, RRCimpulse, toggle = toggle_RRC) #if toggle False, this function just returns symbols
 
-    else:
-        tx = symbols
 
     snr_begin = 10
     snr_db = np.arange(snr_begin,snr_begin+10,1)
@@ -82,18 +87,13 @@ def main():
 
     for i, snr_dbi in enumerate(snr_db):
 
-        rx = f.add_noise(tx, snr_dbi, sps, Modbits)
+        Gaussian_noise_rx = f.add_noise(tx, snr_dbi, sps, Modbits)
 
-        if(toggle_RRC):
+        Phase_Noise_rx = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, plot_phasenoise=False, toggle=toggle_phasenoise)
 
-            filtered_signal = f.matched_filter(rx, RRCimpulse)
+        filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
 
-            downsampled_rx = f.downsample(filtered_signal, sps)
-        
-        else:
-            downsampled_rx = rx
-
-        
+        downsampled_rx = f.downsample(filtered_signal, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
 
         demod_symbols = f.max_likelihood_decision(downsampled_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
 
