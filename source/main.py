@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import functions as f
-
+import testing as t
 """
 TO DO:
     -probatilistic shaping
@@ -31,11 +31,10 @@ TO DO:
 """
 def main():
     num_symbols = 10000
-    Modbits = 6 #4 if 16QAM, 6 is 64QAM
+    Modbits = 4 #4 if 16QAM, 6 is 64QAM
 
-    #base 
-    Rs = 1000000#Symbol rate in symbols/second
-    Linewidth = 1000#Linewidth of laser in Hz
+    maxDvT = 1.5/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    Linewidth = 5000 #Linewidth of laser in Hz
 
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
@@ -43,12 +42,15 @@ def main():
     sps= 16 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
 
-    toggle_RRC = True #true means on
-    toggle_phasenoise = False  #true means on
+    toggle_RRC = False #true means on
+    toggle_phasenoise = True  #true means on
+    toggle_phasenoisecompensation = True #true means on
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
 
+    #There is a max Linewidth * T = maxDvT
+    Rs = Linewidth/(sps*maxDvT)
 
     original_bits = np.random.randint(0, 2, size=num_symbols * Modbits)  
 
@@ -80,17 +82,27 @@ def main():
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
     axs1 = axs1.flatten()  # Flatten the array for easy indexing
 
+    fig3, axs3 = plt.subplots(2, 2, figsize=(8, 8))  
+    axs3= axs3.flatten()  # Flatten the array for easy indexing
+
+    fig4, axs4 = plt.subplots(2, 2, figsize=(8, 8))  
+    axs4= axs4.flatten()  # Flatten the array for easy indexing
+
     BER = np.zeros(len(snr_db))
     SER = np.empty(len(snr_db))
-
-    
 
     for i, snr_dbi in enumerate(snr_db):
 
         Gaussian_noise_rx = f.add_noise(tx, snr_dbi, sps, Modbits)
 
-        Phase_Noise_rx = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, plot_phasenoise=False, toggle=toggle_phasenoise)
+        Phase_Noise_rx, theta = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, toggle=toggle_phasenoise)
 
+    #TEST:
+        frac = 0.05
+        Phase_Noise_rx, thetaHat = t.phase_noise_compensation(Phase_Noise_rx, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
+
+
+        
         filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
 
         downsampled_rx = f.downsample(filtered_signal, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
@@ -114,7 +126,15 @@ def main():
             f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
                     # Highlight erroneous symbols
             axs1[i//3].scatter(downsampled_rx[erroneous_indexes].real, downsampled_rx[erroneous_indexes].imag, color='red', label='Errors', alpha=0.5)
-        
+
+            axs4[i//3].plot(np.arange(num_symbols*sps), theta)
+            axs4[i//3].set_title('Phase Noise')
+            axs4[i//3].grid(True)
+
+            axs3[i//3].plot(np.arange(num_symbols*sps), thetaHat, color='red')
+            axs3[i//3].set_title('Phase Noise Estimate')
+            axs3[i//3].grid(True)
+
     plt.tight_layout()
     plt.show()
 
@@ -135,7 +155,6 @@ def main():
     axs2[1].grid(True)
     plt.tight_layout()
     plt.show()
-
 
     """
     # Create a figure for constellation plots

@@ -254,7 +254,7 @@ def max_likelihood_decision(rx_symbols, Modbits):
     
 
     ML_symbols = np.empty(len(rx_symbols), dtype=complex)
-
+    print(len(ML_symbols))
     for i, rx_symbol in enumerate(rx_symbols):
         # Find the closest symbol (maximum likelihood detection)
         ML_symbols[i] = min(constellation, key=lambda s: np.abs(s - rx_symbol)) 
@@ -364,7 +364,7 @@ def decode_symbols(symbols, Modbits):
     return bits
 
 @benchmark(enable_benchmark)
-def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, plot_phasenoise, toggle):
+def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, toggle):
     #This function adds phase noise to the transmitted symbols, modelled by a Wiener Process.
 
     #symbols: symbols sent
@@ -382,15 +382,7 @@ def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, plot_phasenoise, toggle)
         theta = np.cumsum(delta_theta) #an array of phase shift vs time
         symbols *= np.exp(1j * theta)
 
-        if(plot_phasenoise):            #plotting phase noise
-            t = np.arange(0,len(theta))
-            plt.plot(t, theta)
-            plt.xlabel("Time")
-            plt.ylabel("Phase Noise")
-            plt.title("Phase Noise")
-            plt.show()
-
-        return symbols
+        return symbols, theta
     else:
-        return symbols
+        return symbols, np.zeros(len(symbols))
     
