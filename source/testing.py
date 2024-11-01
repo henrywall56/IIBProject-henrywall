@@ -3,49 +3,59 @@ import matplotlib.pyplot as plt
 from scipy.signal import convolve
 import functions as f
 
-def soft_phase_estimator(y, Modbits):
+def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
     #SOFT-DECISION PHASE-ESTIMATOR:
     #transmitted symbols x
     #received symbols y
     #theta is actual phase noise
 
-    #have estimate of phase noise thetaHat
-
-    #De-rotare received symbols by estimate of noise
-    xHat_predecision = y*np.exp(-1j*thetaHat) #Compensate for phase estimate
+    r,alpha,L = generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac)
+    delta = 0   
+    w = generate_Wiener_coefficients(r, alpha, L, delta)
     
-    #Pass de-rotated through a decision device
-    xHat = f.max_likelihood_decision(xHat_predecision, Modbits) 
 
-    #At high SNR, xHat = x with high probability
+    num_samples = len(y)
+    psi_unwrapped = np.zeros(num_samples)  # Output array
+    theta_estimate = 0.0  # Initial theta[k+1] estimate
+    psi = np.zeros(num_samples)  # Intermediate phase differences
 
-    #psi = theta + n'   
-    #n' is angular projection of Gaussian noise in direction orthogonal to x*exp(j*theta)
-    psi = np.angle(y) - np.angle(xHat)
+    for k in range(num_samples):
 
-    psi_unwrapped = np.unwrap([psi])
+        xHatk_predecision = y[k] * np.exp(-1j * theta_estimate)
+        xHatk = f.max_likelihood_decision(np.array([xHatk_predecision]), Modbits)[0] #Pass through decision function
+    
+        psi[k] = np.angle(y[k]) - np.angle(xHatk)
+        
+        # Unwrapping logic
+        if k >=3:
+            #p = np.floor(0.5 + (psi_unwrapped[k-1] - psi[k]) / (2 * np.pi))
+            
+            p = np.floor(0.5 + ((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3]) - psi[k]) / (2 * np.pi))
 
-    return psi_unwrapped #To be passed through a Wiener Filter
+            psi_unwrapped[k] = psi[k-1] + p * 2 * np.pi
+        
+        else:
+            psi_unwrapped[k] = psi[k]
+       
 
-def hard_phase_estimator(psi, r, alpha, L, delta, wplot_toggle):
-    #HARD DECISION PHASE ESTIMATOR:
-    #psi is the phase noise corrupted by Gaussian noise n'
-    #Pass psi through a Wiener filter W(z)
-    #Output is the MMSE estimate thetaHat of the actual carrier phase theta
-    #alpha and r are parameters of Wiener Filter
-    #L is length of filter
-    #delta is delay of filter
-    #wplot_toggle = True to display filter plot
+        # Update theta estimate using the Wiener filter after enough samples
+        if k >= L-1:  # Ensure we have enough samples for the filter
+            #Only need one element of convolution:
+            theta_estimate = sum(w[l] * psi_unwrapped[k - l] for l in range(L))
+    """""
+    for x,y in enumerate(w):
+        plt.plot([x, x],[0,y], color='blue', linestyle='-', linewidth=2)
+    plt.title("SD Wiener")
+    plt.show()
+    """""
+    return psi_unwrapped
 
-    n  = np.linspace(-delta, L-delta, L+1) #make L odd, so symmetrical about 0
 
+def generate_Wiener_coefficients(r, alpha, L, delta):
+    n  = np.linspace(-delta, L-delta-1, L) #make L odd, so symmetrical about 0
     w = alpha**(abs(n)) * alpha*r / (1-alpha**2)
+    return w
 
-    if(wplot_toggle==True):
-        plt.plot(n,w)
-        plt.show()  
-    
-    return convolve(psi, w, mode="same") #return best estimate of carrier phase
     
 
 def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
@@ -74,6 +84,8 @@ def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
     var_n = half_constellation_penalty / snrsymb
     r = var_p / var_n 
     alpha = (1 + 0.5*r) - np.sqrt((1+0.5*r)**2 - 1)
+
+
     #neglect coefficients that are less than a fraction f og value of largest coefficient
     L=np.ceil(2*np.log2(1/frac)/np.log2(1/alpha))
     L=int(L)
@@ -82,7 +94,7 @@ def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
 
     return r, alpha, L
 
-def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, wplot_toggle=False, thetaplot_toggle=False):
+def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, toggle_phasenoisecompensation):
     #rx: Received signal
     #sps: Samples per symbol
     #Rs: symbol rate symbols/second
@@ -93,32 +105,45 @@ def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, wpl
     #wplot_toggle: True means plot the Wiener filter coefficients
     #thetaplot_toggle: True means plot phase noise estimate
 
-    #Wiener filter parameters:
-    r, alpha, L = generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac)
+    if(toggle_phasenoisecompensation==False):
+        return rx, np.zeros(len(rx))
+    
+    else:
 
-    SD_delta = 0 #delta for soft decision phase estimator
+        #Wiener filter parameters:
+        r, alpha, L = generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac)
 
-    psi_unwrapped = soft_phase_estimator(rx, Modbits) #Returns first estimate of phase noise, corrupted by Gaussian noise
+        
+        #delta: delay of FIR filter.
 
-    #delta: delay of FIR filter.
+        psi_unwrapped = soft_phase_estimator(rx, sps, Rs, Linewidth, snrb_db, Modbits, frac) #Returns first estimate of phase noise, corrupted by Gaussian noise
 
-    HD_delta = np.floor(L-0.5) #delta for hard decision Wiener filter
+        #HARD DECISION PHASE ESTIMATOR:
 
-    thetaHat = hard_phase_estimator(psi_unwrapped, r, alpha, L, HD_delta, wplot_toggle) #Best estimate of phase noise
+        HD_delta = np.floor((L-1)/2) #delta for hard decision Wiener filter
+        
+        print('r=', r, 'L=', L, 'a=', alpha, 'snr_db=', snrb_db)
+        wiener_HD = generate_Wiener_coefficients(r, alpha, L, HD_delta)
 
-    if(thetaplot_toggle==True):
-        plt.plot(np.arange(len(thetaHat)), thetaHat)
+        """""
+        for x,y in enumerate(wiener_HD):
+            plt.plot([x, x],[0,y], color='blue', linestyle='-', linewidth=2)
+        plt.title("HD Wiener")
         plt.show()
+        """""
 
-    rx *= np.exp(-1j*thetaHat) #de-rotate by phase noise estimate
+        #convolve psi_unwrapped with wiener_HD to get thetaHat
 
-    return rx
+        thetaHat = convolve(psi_unwrapped, wiener_HD, mode="same")
 
-#TODO:
-    #need to have thetahat estimate for soft decision part
-    #check if implementing correctly, eg look at offset Delta in paper
+        rx *= np.exp(-1j*thetaHat) #de-rotate by phase noise estimate
 
-hard_phase_estimator(psi=[1,2,4,4,5,6,7], sps=1, Rs=10000000, Linewidth=1000, Modbits=4, snrb_db=10, frac=0.001, delta=2 ,wplot_toggle=True)
+        return rx, thetaHat 
+
+
+
+#compensated_phase = phase_noise_compensation(rx, sps=1, Rs=100000, Linewidth=1000, Modbits=4, snrb_db=10, frac=0.01, wplot_toggle=True, thetaplot_toggle=True)
+
 
 """"
 def phase_unwrap(psi):
