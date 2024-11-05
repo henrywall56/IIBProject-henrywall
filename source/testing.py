@@ -8,9 +8,11 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
     #transmitted symbols x
     #received symbols y
     #theta is actual phase noise
+    T = 1/(Rs*sps)
     
     r,alpha,L = generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac)
     delta = 0   
+    L = L//2 #Do we use half value for soft phase estimator?
     w = generate_Wiener_coefficients(r, alpha, L, delta)
     
     print('SD Wiener', 'r=', r, 'L=', L, 'a=', alpha, 'snr_db=', snrb_db)
@@ -18,6 +20,7 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
     num_samples = len(y)
     psi_unwrapped = np.zeros(num_samples)  # Output array
     theta_estimate = 0.0  # Initial theta[k+1] estimate
+
     psi = np.zeros(num_samples)  # Intermediate phase differences
 
     for k in range(num_samples):
@@ -31,7 +34,10 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
         if k >=3:
             #p = np.floor(0.5 + (psi_unwrapped[k-1] - psi[k]) / (2 * np.pi))
             
-            p = np.floor(0.5 + (((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3])-psi[k])/(2*np.pi)))
+            #p = np.floor(0.5 + (((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3])-psi[k])/(2*np.pi)))
+
+            
+            p=0
 
             psi_unwrapped[k] = psi[k-1] + p * 2 * np.pi
         
@@ -43,6 +49,8 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
         if k >= L-1:  # Ensure we have enough samples for the filter
             #Only need one element of convolution:
             theta_estimate = sum(w[l] * psi_unwrapped[k - l] for l in range(L))
+       
+
     """""
     for x,y in enumerate(w):
         plt.plot([x, x],[0,y], color='blue', linestyle='-', linewidth=2)
@@ -76,7 +84,11 @@ def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
     var_p = 2*np.pi*Linewidth*T #phase noise variance
     snrb = 10 ** (snrb_db / 10) #snr per bit (Linear)
     snrsymb = Modbits * snrb #snr per symbol
-    if(Modbits == 4): #16-QAM
+
+    if(Modbits == 2): #QPSK
+        constellation_penalty = 1
+        half_constellation_penalty = constellation_penalty/2
+    elif(Modbits == 4): #16-QAM
         constellation_penalty = 1.889
         half_constellation_penalty = constellation_penalty/2
     elif(Modbits == 6): #64-QAM
@@ -85,6 +97,7 @@ def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
     var_n = half_constellation_penalty / snrsymb
     r = var_p / var_n 
     alpha = (1 + 0.5*r) - np.sqrt((1+0.5*r)**2 - 1)
+    
 
     #neglect coefficients that are less than a fraction f og value of largest coefficient
     L=np.ceil(2*np.log2(1/frac)/np.log2(1/alpha))

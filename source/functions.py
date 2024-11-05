@@ -22,6 +22,22 @@ def benchmark(enabled=enable_benchmark):
     return decorator
 
 @benchmark(enable_benchmark)
+def generate_QPSK_symbols(bits):
+    # QPSK is 2 bits/symbol, so create array of blocks of 4 bits
+    # Mapping dictionary for 16QAM symbols
+    symbol_mapping = {
+        (0,0): -1 - 1j,
+        (0,1): -1 + 1j,
+        (1,0):  1 - 1j,
+        (1,1):  1 + 1j,
+    }
+    # Convert bits to symbols using the dictionary
+    symbols = np.array([
+        symbol_mapping[tuple(bits[i:i + 2])] for i in range(0, len(bits), 2)
+    ])
+    return symbols/np.sqrt(2)
+
+@benchmark(enable_benchmark)
 def generate_16qam_symbols(bits):
     # 16QAM is 4 bits/symbol, so create array of blocks of 4 bits
     # Mapping dictionary for 16QAM symbols
@@ -144,13 +160,13 @@ def pulseshaping(symbols, sps, RRCimpulse, toggle):
         return symbols
 
 @benchmark(enable_benchmark)
-def add_noise(signal, snr_db, sps, Modbits): 
+def add_noise(signal, snrb_db, sps, Modbits): 
     #addition of circular Gaussian noise to transmitted signal
-    #snr_db snr per bit in dB in transmitted signal
+    #snrb_db snr per bit in dB in transmitted signal
     #Modbits per symbol eg 16QAM or 64QAM etc.
     #sps samples per symbol
 
-    snr = 10 ** (snr_db / 10) #dB to linear (10 since power)
+    snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
     stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
 
@@ -221,10 +237,13 @@ def RRC(span, rolloff, sps):
     t = np.arange(-span * sps / 2, span * sps / 2 + 1)
     return g , t
 
-@benchmark(enable_benchmark)
+@benchmark(False)
 def max_likelihood_decision(rx_symbols, Modbits):
     #returns the closest symbols in the constellation to the inputed rx_symbols
-    # Define the 16QAM constellation points
+    if(Modbits==2):
+        constellation = np.array([1+1j, -1+1j, 1-1j, -1-1j
+                                  ])/np.sqrt(2)
+
     if(Modbits==4):
         constellation = np.array([
             -3 + 3j, -3 + 1j, -3 - 1j, -3 - 3j,
@@ -266,7 +285,16 @@ def max_likelihood_decision(rx_symbols, Modbits):
 @benchmark(enable_benchmark)
 def decode_symbols(symbols, Modbits):
     #turns symbols back to bitstream
-    if(Modbits==4): #16QAM
+    if(Modbits==2): #QPSK
+        symbol_mapping = {
+            (0,0): -1 - 1j,
+            (0,1): -1 + 1j,
+            (1,0):  1 - 1j,
+            (1,1):  1 + 1j,
+        }
+        root = 2
+
+    elif(Modbits==4): #16QAM
         symbol_mapping = {
             (0, 0, 0, 0): -3 + 3j,
             (0, 0, 0, 1): -1 + 3j,
@@ -285,7 +313,7 @@ def decode_symbols(symbols, Modbits):
             (1, 0, 0, 1): -1 - 3j,
             (1, 0, 0, 0): -3 - 3j,
         }
-        root =10
+        root = 10
 
     elif(Modbits==6):
         symbol_mapping = {
