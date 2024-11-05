@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import functions as f
-import testing as t
+import DDPhaseRecoveryTesting as t
+import BPSPhaseRecoveryTesting as b
 """
 TO DO:
     -probatilistic shaping
@@ -30,11 +31,11 @@ TO DO:
 
 """
 def main():
-    num_symbols = 10000
+    num_symbols = 1000
     
-    Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    maxDvT = 8/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    maxDvT = 2/(10**4) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
     Linewidth = 10**5 #Linewidth of laser in Hz
     
     #Generate RRC filter impulse response
@@ -98,15 +99,18 @@ def main():
     SER = np.empty(len(snr_db))
 
     for i, snr_dbi in enumerate(snr_db):
-
+        print(f'Processing SNR {snr_dbi}')
         Gaussian_noise_rx = f.add_noise(tx, snr_dbi, sps, Modbits)
 
         Phase_Noise_rx, theta = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, toggle=toggle_phasenoise)
         
         filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
-
-        Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
-
+        
+        #Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
+        
+        N=20
+        B=100
+        Phase_Noise_compensated, thetaHat = b.BPS(filtered_signal,Modbits,N,B, toggle_phasenoisecompensation)
         downsampled_rx = f.downsample(Phase_Noise_compensated, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
 
         demod_symbols = f.max_likelihood_decision(downsampled_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM

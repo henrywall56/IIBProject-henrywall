@@ -34,10 +34,7 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
         if k >=3:
             #p = np.floor(0.5 + (psi_unwrapped[k-1] - psi[k]) / (2 * np.pi))
             
-            #p = np.floor(0.5 + (((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3])-psi[k])/(2*np.pi)))
-
-            
-            p=0
+            p = np.floor(0.5 + (((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3])-psi[k])/(2*np.pi)))
 
             psi_unwrapped[k] = psi[k-1] + p * 2 * np.pi
         
