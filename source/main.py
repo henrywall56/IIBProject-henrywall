@@ -31,16 +31,20 @@ TO DO:
 """
 def main():
     num_symbols = 10000
-    Modbits = 4 #4 if 16QAM, 6 is 64QAM
+    
+    Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    maxDvT = 1/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
-    Linewidth = 1000 #Linewidth of laser in Hz
-
+    maxDvT = 8/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    Linewidth = 10**5 #Linewidth of laser in Hz
+    
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
     span= 20 #Span of filter
     sps= 16 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
+
+    #Wiener Filter length parameters:
+    frac = 0.05
 
     toggle_RRC = False #true means on
     toggle_phasenoise = True #true means on
@@ -52,18 +56,25 @@ def main():
         sps=1               #overwrite sps if no RRC
 
     #There is a max Linewidth * T = maxDvT
+    #T = 1/(Rs*sps)
     Rs = Linewidth/(sps*maxDvT) #Rs symbol rate symbols/second
-
+    
     original_bits = np.random.randint(0, 2, size=num_symbols * Modbits)  
 
 
     # Generate symbols
-    if(Modbits==4): #16QAM
+    if(Modbits==2): #16QAM
+        symbols = f.generate_QPSK_symbols(original_bits)
+        plotsize = 2
+        snr_begin=5
+    elif(Modbits==4): #16QAM
         symbols = f.generate_16qam_symbols(original_bits)
         plotsize = 2
+        snr_begin=10
     elif(Modbits==6): #64QAM
         symbols = f.generate_64qam_symbols(original_bits) 
         plotsize = 1.5
+        snr_begin=10
     
     
 
@@ -72,8 +83,6 @@ def main():
         #Pulse shaping with RRC filter
     tx = f.pulseshaping(symbols, sps, RRCimpulse, toggle = toggle_RRC) #if toggle False, this function just returns symbols
 
-
-    snr_begin = 10
     snr_db = np.arange(snr_begin,snr_begin+10,1)
 
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
@@ -93,15 +102,12 @@ def main():
         Gaussian_noise_rx = f.add_noise(tx, snr_dbi, sps, Modbits)
 
         Phase_Noise_rx, theta = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, toggle=toggle_phasenoise)
-
-    #TEST:
-        frac = 0.05
-
-        Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(Phase_Noise_rx, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
         
-        filtered_signal = f.matched_filter(Phase_Noise_compensated, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
+        filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
 
-        downsampled_rx = f.downsample(filtered_signal, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
+        Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
+
+        downsampled_rx = f.downsample(Phase_Noise_compensated, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
 
         demod_symbols = f.max_likelihood_decision(downsampled_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
 
@@ -125,8 +131,8 @@ def main():
             axs1[i//3].scatter(downsampled_rx[erroneous_indexes].real, downsampled_rx[erroneous_indexes].imag, color='red', label='Errors', alpha=0.5)
 
             if(toggle_plotuncompensatedphase==True):
-                f.plot_constellation(axs3[i//3], Phase_Noise_rx, title=f'No Derotation at SNR= {snr_dbi}dB', lim=plotsize)
-            print(theta)
+                f.plot_constellation(axs3[i//3], filtered_signal[1::sps], title=f'No Derotation at SNR= {snr_dbi}dB', lim=plotsize)
+            
             axs4[i//3].plot(np.arange(num_symbols*sps), theta, label='Phase')
             axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB')
             axs4[i//3].grid(True)
@@ -135,7 +141,7 @@ def main():
             
 
             if(toggle_ploterrorindexes==True):
-                axs4[i//3].vlines(erroneous_indexes, ymin=-0.01, ymax=0.01, colors='g', alpha=0.2, label='Erroneous Indexes')
+                axs4[i//3].vlines(erroneous_indexes*sps, ymin=-0.01, ymax=0.01, colors='g', alpha=0.2, label='Erroneous Indexes')
             axs4[i//3].legend(loc='lower left')
 
     plt.tight_layout()
