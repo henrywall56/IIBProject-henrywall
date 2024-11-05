@@ -33,8 +33,8 @@ def main():
     num_symbols = 10000
     Modbits = 4 #4 if 16QAM, 6 is 64QAM
 
-    maxDvT = 1.5/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
-    Linewidth = 5000 #Linewidth of laser in Hz
+    maxDvT = 1/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    Linewidth = 1000 #Linewidth of laser in Hz
 
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
@@ -43,14 +43,16 @@ def main():
     rolloff = 0.1 #Roll-off of RRC
 
     toggle_RRC = False #true means on
-    toggle_phasenoise = True  #true means on
+    toggle_phasenoise = True #true means on
     toggle_phasenoisecompensation = True #true means on
+    toggle_plotuncompensatedphase = True #true means on
+    toggle_ploterrorindexes = True #true means on
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
 
     #There is a max Linewidth * T = maxDvT
-    Rs = Linewidth/(sps*maxDvT)
+    Rs = Linewidth/(sps*maxDvT) #Rs symbol rate symbols/second
 
     original_bits = np.random.randint(0, 2, size=num_symbols * Modbits)  
 
@@ -67,11 +69,6 @@ def main():
 
     RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
-    if(toggle_RRC):
-        plt.plot(t1, RRCimpulse, '.')
-        plt.title('RRC Filter Impulse Reponse')
-        plt.show()
-
         #Pulse shaping with RRC filter
     tx = f.pulseshaping(symbols, sps, RRCimpulse, toggle = toggle_RRC) #if toggle False, this function just returns symbols
 
@@ -81,9 +78,9 @@ def main():
 
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
     axs1 = axs1.flatten()  # Flatten the array for easy indexing
-
-    fig3, axs3 = plt.subplots(2, 2, figsize=(8, 8))  
-    axs3= axs3.flatten()  # Flatten the array for easy indexing
+    if(toggle_plotuncompensatedphase==True):
+        fig3, axs3 = plt.subplots(2, 2, figsize=(8, 8))  
+        axs3= axs3.flatten()  # Flatten the array for easy indexing
 
     fig4, axs4 = plt.subplots(2, 2, figsize=(8, 8))  
     axs4= axs4.flatten()  # Flatten the array for easy indexing
@@ -99,11 +96,10 @@ def main():
 
     #TEST:
         frac = 0.05
-        Phase_Noise_rx, thetaHat = t.phase_noise_compensation(Phase_Noise_rx, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
 
-
+        Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(Phase_Noise_rx, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
         
-        filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
+        filtered_signal = f.matched_filter(Phase_Noise_compensated, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
 
         downsampled_rx = f.downsample(filtered_signal, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
 
@@ -123,17 +119,24 @@ def main():
         # Plot downsampled received constellation, including different colour for erroneous results
         #Only plot some of the results:
         if(i%3==0):
+
             f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
                     # Highlight erroneous symbols
             axs1[i//3].scatter(downsampled_rx[erroneous_indexes].real, downsampled_rx[erroneous_indexes].imag, color='red', label='Errors', alpha=0.5)
 
-            axs4[i//3].plot(np.arange(num_symbols*sps), theta)
-            axs4[i//3].set_title('Phase Noise')
+            if(toggle_plotuncompensatedphase==True):
+                f.plot_constellation(axs3[i//3], Phase_Noise_rx, title=f'No Derotation at SNR= {snr_dbi}dB', lim=plotsize)
+            print(theta)
+            axs4[i//3].plot(np.arange(num_symbols*sps), theta, label='Phase')
+            axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB')
             axs4[i//3].grid(True)
 
-            axs3[i//3].plot(np.arange(num_symbols*sps), thetaHat, color='red')
-            axs3[i//3].set_title('Phase Noise Estimate')
-            axs3[i//3].grid(True)
+            axs4[i//3].plot(np.arange(num_symbols*sps), thetaHat, color='red', label='Phase Estimate')
+            
+
+            if(toggle_ploterrorindexes==True):
+                axs4[i//3].vlines(erroneous_indexes, ymin=-0.01, ymax=0.01, colors='g', alpha=0.2, label='Erroneous Indexes')
+            axs4[i//3].legend(loc='lower left')
 
     plt.tight_layout()
     plt.show()
