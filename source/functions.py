@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import convolve #upfirdn for up/down sampling
 import time
 
+
 #References: Digital Coherent Optical Systems Textbook, Matlab Code, page 38
 
 enable_benchmark = True  #True turns on benchmarking
@@ -188,7 +189,7 @@ def plot_constellation(ax, symbols, title, lim=2):
 def downsample(signal, sps, toggle):
     if(toggle==True):
         #downsample a signal that has sps samples per symbol
-        downsampled = signal[::sps]
+        downsampled = signal[1::sps]
         return downsampled
     else:
         return signal
@@ -254,7 +255,7 @@ def max_likelihood_decision(rx_symbols, Modbits):
     
 
     ML_symbols = np.empty(len(rx_symbols), dtype=complex)
-    print(len(ML_symbols))
+    
     for i, rx_symbol in enumerate(rx_symbols):
         # Find the closest symbol (maximum likelihood detection)
         ML_symbols[i] = min(constellation, key=lambda s: np.abs(s - rx_symbol)) 
@@ -375,14 +376,15 @@ def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, toggle):
     if(Linewidth != 0 and toggle==True):
 
         T = 1/(sps*Rs) #period between samples at the oversampled transmit signal
-
+        
         #Calculating phase noise:
         Var = 2*np.pi*Linewidth*T           
         delta_theta = np.sqrt(Var)*np.random.randn(sps*Nsymb)
         theta = np.cumsum(delta_theta) #an array of phase shift vs time
-        symbols *= np.exp(1j * theta)
+        rotated_symbols = symbols * np.exp(1j * theta)
 
-        return symbols, theta
+        return rotated_symbols, theta
     else:
         return symbols, np.zeros(len(symbols))
     
+

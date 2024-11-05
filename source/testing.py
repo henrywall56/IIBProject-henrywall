@@ -8,11 +8,12 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
     #transmitted symbols x
     #received symbols y
     #theta is actual phase noise
-
+    
     r,alpha,L = generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac)
     delta = 0   
     w = generate_Wiener_coefficients(r, alpha, L, delta)
     
+    print('SD Wiener', 'r=', r, 'L=', L, 'a=', alpha, 'snr_db=', snrb_db)
 
     num_samples = len(y)
     psi_unwrapped = np.zeros(num_samples)  # Output array
@@ -30,7 +31,7 @@ def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
         if k >=3:
             #p = np.floor(0.5 + (psi_unwrapped[k-1] - psi[k]) / (2 * np.pi))
             
-            p = np.floor(0.5 + ((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3]) - psi[k]) / (2 * np.pi))
+            p = np.floor(0.5 + (((1/3)*(psi_unwrapped[k-1]+psi_unwrapped[k-2]+psi_unwrapped[k-3])-psi[k])/(2*np.pi)))
 
             psi_unwrapped[k] = psi[k-1] + p * 2 * np.pi
         
@@ -85,7 +86,6 @@ def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
     r = var_p / var_n 
     alpha = (1 + 0.5*r) - np.sqrt((1+0.5*r)**2 - 1)
 
-
     #neglect coefficients that are less than a fraction f og value of largest coefficient
     L=np.ceil(2*np.log2(1/frac)/np.log2(1/alpha))
     L=int(L)
@@ -106,7 +106,8 @@ def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, tog
     #thetaplot_toggle: True means plot phase noise estimate
 
     if(toggle_phasenoisecompensation==False):
-        return rx, np.zeros(len(rx))
+        
+        return rx, np.zeros(len(rx)) 
     
     else:
 
@@ -122,7 +123,7 @@ def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, tog
 
         HD_delta = np.floor((L-1)/2) #delta for hard decision Wiener filter
         
-        print('r=', r, 'L=', L, 'a=', alpha, 'snr_db=', snrb_db)
+        print('HD Wiener', 'r=', r, 'L=', L, 'a=', alpha, 'snr_db=', snrb_db)
         wiener_HD = generate_Wiener_coefficients(r, alpha, L, HD_delta)
 
         """""
@@ -136,23 +137,7 @@ def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, tog
 
         thetaHat = convolve(psi_unwrapped, wiener_HD, mode="same")
 
-        rx *= np.exp(-1j*thetaHat) #de-rotate by phase noise estimate
+        derotated = rx*np.exp(-1j*thetaHat) #de-rotate by phase noise estimate
+       
+        return derotated, thetaHat 
 
-        return rx, thetaHat 
-
-
-
-#compensated_phase = phase_noise_compensation(rx, sps=1, Rs=100000, Linewidth=1000, Modbits=4, snrb_db=10, frac=0.01, wplot_toggle=True, thetaplot_toggle=True)
-
-
-""""
-def phase_unwrap(psi):
-    # psi is carrier phase prior to the unwrapper
-    
-    for k in range(len(psi) - 1):
-        p = np.floor(0.5 + (psi[k] - psi[k + 1]) / (2 * np.pi))
-        psi[k + 1] = psi[k+1] + p * (2 * np.pi) #note psi[k] doesn't rely on psi[k+1] like paper suggests
-    return psi
-
-#or use np.unwrap
-"""""
