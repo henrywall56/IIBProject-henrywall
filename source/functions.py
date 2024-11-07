@@ -416,7 +416,7 @@ def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, toggle):
         return rotated_symbols, theta
     else:
         return symbols, np.zeros(len(symbols))
-    
+
 def convmtx(vector, L):
     """
     Create a convolution matrix from the input vector with length L.
@@ -440,7 +440,7 @@ def convmtx(vector, L):
     return result
 
 
-
+@benchmark(enable_benchmark)
 def BPS(z,Modbits,N,B, toggle_phasenoisecompensation):
     #Blind Phase Search Phase compensation
     #z is received signal to derotate
@@ -502,7 +502,8 @@ def invert(nparr):
     #Note input MUST be a numpy array
     #Same as ~ NOT in Matlab, for array of ones and zeros
     return 1-nparr
-   
+
+@benchmark(enable_benchmark)  
 def Differential_Encoding_qpsk(bits):
     #Differential Encoding of QPSK
     Modbits = 2
@@ -528,6 +529,7 @@ def Differential_Encoding_qpsk(bits):
 
     return x
 
+@benchmark(enable_benchmark)
 def Differential_Encoding_16qam(bits):
     #Differential Encoding of 16-QAM
     Modbits = 4
@@ -562,10 +564,45 @@ def Differential_Encoding_16qam(bits):
 
     return normalised_x
 
+@benchmark(enable_benchmark)
 def Differential_Encoding_64qam(bits):
     #Differential Encoding of 64-QAM
     Modbits = 6
 
+    #Bits that define the quadrant:
+    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
+    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
+
+    #Bits that define the symbols inside the quadrant:
+    InQuadBits1 = np.array(bits[2:len(bits):Modbits], dtype=np.int64)
+    InQuadBits2 = np.array(bits[3:len(bits):Modbits], dtype=np.int64)
+    InQuadBits3 = np.array(bits[4:len(bits):Modbits], dtype=np.int64)
+    InQuadBits4 = np.array(bits[5:len(bits):Modbits], dtype=np.int64)
+
+    #Defining the quadrant:
+    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
+    
+    #Defining the symbol inside the quadrants:
+    InQuadI = 7 - (InQuadBits1&invert(InQuadBits2))*2 - (InQuadBits1&InQuadBits2)*4 - (invert(InQuadBits1)&InQuadBits2)*6 
+    InQuadQ = 7 - (InQuadBits3&invert(InQuadBits4))*2 - (InQuadBits3&InQuadBits4)*4 - (invert(InQuadBits3)&InQuadBits4)*6 
+    InQuadSymbol = InQuadI + 1j*InQuadQ
+
+    #Initial Quadrant
+    QuadPrev = 1
+
+    #Modulation
+    x = np.zeros(len(InQuadBits2), dtype=complex)
+    
+    for i in range(len(x)):
+        x[i] = QuadPrev * Quad[i] * InQuadSymbol[i]
+        QuadPrev = QuadPrev * Quad[i]
+
+    normalised_x = x/np.sqrt(42)
+
+    return normalised_x
+
+
+@benchmark(enable_benchmark)
 def Differential_decode_symbols(symbols, Modbits):
     #Differential decoding of symbols to bits
     QPrev = 0
@@ -670,6 +707,153 @@ def Differential_decode_symbols(symbols, Modbits):
         Decided = np.array(Decided).flatten()
 
         return Decided
-
+    
+    
     elif(Modbits==6):
-        x=1
+        #Decision Regions for In-Phase component
+        R9 = np.real(symbols) >= 0
+        R10 = np.real(symbols) >= 2/np.sqrt(42)
+        R11 = np.real(symbols) >= 4/np.sqrt(42)
+        R12 = np.real(symbols) >= 6/np.sqrt(42)
+        R13 = np.real(symbols) < 0
+        R14 = np.real(symbols) <= -2/np.sqrt(42)
+        R15 = np.real(symbols) <= -4/np.sqrt(42)
+        R16 = np.real(symbols) <= -6/np.sqrt(42)
+        #Decision Regions for Quadrature component
+        R1 = np.imag(symbols) >= 0
+        R2 = np.imag(symbols) >= 2/np.sqrt(42)
+        R3 = np.imag(symbols) >= 4/np.sqrt(42)
+        R4 = np.imag(symbols) >= 6/np.sqrt(42)
+        R5 = np.imag(symbols) < 0
+        R6 = np.imag(symbols) <= -2/np.sqrt(42)
+        R7 = np.imag(symbols) <= -4/np.sqrt(42)
+        R8 = np.imag(symbols) <= -6/np.sqrt(42)
+        
+        #Defining the quadrant (each SOP relates to 16 symbols in quadrant)
+        Q = np.zeros(len(symbols), dtype=int)
+        Q[R1&R9] = 0  
+        Q[R1&R13] = 1
+        Q[R5&R13] = 2
+        Q[R5&R9] = 3
+
+        #Defining the symbol inside the quadrants:
+        S = np.zeros(len(symbols), dtype=int)
+        S[R4&R12 | R4&R16 | R8&R16 | R8&R12] = 0
+        S[R1&~R2&R12 | R4&R13&~R14 | R5&~R6&R16 | R9&~R10&R8] = 1
+        S[R3&~R4&R12 | R15&~R16&R4 | R7&~R8&R16 | R11&~R12&R8] = 2
+        S[R2&~R3&R12 | R14&~R15&R4 | R6&~R7&R16 | R10&~R11&R8] = 3
+        S[R9&~R10&R4 | R1&~R2&R16 | R13&~R14&R8 | R5&~R6&R12] = 4
+        S[R1&~R2&R9&~R10 | R13&~R14&R1&~R2 | R5&~R6&R13&~R14 | R9&~R10&R5&~R6] = 5
+        S[R3&~R4&R9&~R10 | R15&~R16&R1&~R2 | R7&~R8&R13&~R14 | R5&~R6&R11&~R12] = 6
+        S[R2&~R3&R9&~R10 | R1&~R2&R14&~R15 | R6&~R7&R13&~R14 | R10&~R11&R5&~R6] = 7 
+        S[R4&R11&~R12 | R16&R3&~R4 | R8&R15&~R16 | R7&~R8&R12] = 8
+        S[R1&~R2&R11&~R12 | R3&~R4&R13&~R14 | R5&~R6&R15&~R16 | R7&~R8&R9&~R10] = 9
+        S[R3&~R4&R11&~R12 | R15&~R16&R3&~R4 | R7&~R8&R15&~R16 | R7&~R8&R11&~R12 ] = 10
+        S[R2&~R3&R11&~R12 | R14&~R15&R3&~R4 | R15&~R16&R6&~R7 | R10&~R11&R7&~R8] = 11
+        S[R4&R10&~R11 | R16&R2&~R3 | R8&R14&~R15 | R6&~R7&R12] = 12
+        S[R1&~R2&R10&~R11 | R2&~R3&R13&~R14 | R5&~R6&R14&~R15 | R9&~R10&R6&~R7] = 13
+        S[R3&~R4&R10&~R11 | R15&~R16&R2&~R3 | R7&~R8&R14&~R15 | R11&~R12&R6&~R7] = 14
+        S[R2&~R3&R10&~R11 | R2&~R3&R14&~R15 | R6&~R7&R14&~R15 | R6&~R7&R10&~R11] = 15
+
+        #Received binary sequence
+        for i in range(len(symbols)):
+            QRx = Q[i] - QPrev
+            if QRx == 0:
+                Decided[i,0] = 0
+                Decided[i,1] = 0
+            elif QRx in {1,-3}:
+                Decided[i,0] = 0
+                Decided[i,1] = 1
+            elif QRx in {3,-1}:
+                Decided[i,0] = 1
+                Decided[i,1] = 0
+            elif QRx in {2,-2}:
+                Decided[i,0] = 1
+                Decided[i,1] = 1
+        
+            QPrev = Q[i]
+
+            if S[i]==0:
+                Decided[i,2] = 0
+                Decided[i,3] = 0
+                Decided[i,4] = 0
+                Decided[i,5] = 0
+            if S[i]==1:
+                Decided[i,2] = 0
+                Decided[i,3] = 0
+                Decided[i,4] = 0
+                Decided[i,5] = 1
+            if S[i]==2:
+                Decided[i,2] = 0
+                Decided[i,3] = 0
+                Decided[i,4] = 1
+                Decided[i,5] = 0
+            if S[i]==3:
+                Decided[i,2] = 0
+                Decided[i,3] = 0
+                Decided[i,4] = 1
+                Decided[i,5] = 1
+            if S[i]==4:
+                Decided[i,2] = 0
+                Decided[i,3] = 1
+                Decided[i,4] = 0
+                Decided[i,5] = 0
+            if S[i]==5:
+                Decided[i,2] = 0
+                Decided[i,3] = 1
+                Decided[i,4] = 0
+                Decided[i,5] = 1
+            if S[i]==6:
+                Decided[i,2] = 0
+                Decided[i,3] = 1
+                Decided[i,4] = 1
+                Decided[i,5] = 0
+            if S[i]==7:
+                Decided[i,2] = 0
+                Decided[i,3] = 1
+                Decided[i,4] = 1
+                Decided[i,5] = 1
+            if S[i]==8:
+                Decided[i,2] = 1
+                Decided[i,3] = 0
+                Decided[i,4] = 0
+                Decided[i,5] = 0
+            if S[i]==9:
+                Decided[i,2] = 1
+                Decided[i,3] = 0
+                Decided[i,4] = 0
+                Decided[i,5] = 1
+            if S[i]==10:
+                Decided[i,2] = 1
+                Decided[i,3] = 0
+                Decided[i,4] = 1
+                Decided[i,5] = 0
+            if S[i]==11:
+                Decided[i,2] = 1
+                Decided[i,3] = 0
+                Decided[i,4] = 1
+                Decided[i,5] = 1
+            if S[i]==12:
+                Decided[i,2] = 1
+                Decided[i,3] = 1
+                Decided[i,4] = 0
+                Decided[i,5] = 0
+            if S[i]==13:
+                Decided[i,2] = 1
+                Decided[i,3] = 1
+                Decided[i,4] = 0
+                Decided[i,5] = 1
+            if S[i]==14:
+                Decided[i,2] = 1
+                Decided[i,3] = 1
+                Decided[i,4] = 1
+                Decided[i,5] = 0
+            if S[i]==15:
+                Decided[i,2] = 1
+                Decided[i,3] = 1
+                Decided[i,4] = 1
+                Decided[i,5] = 1
+
+        Decided = np.array(Decided).flatten()
+        return Decided
+    

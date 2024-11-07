@@ -20,9 +20,9 @@ import DDPhaseRecoveryTesting as t
 def main():
     num_symbols = 10000
     
-    Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    maxDvT = 1/(10**4) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    maxDvT = 1/(10**5) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
     Linewidth = 10**5 #Linewidth of laser in Hz
     
     #Generate RRC filter impulse response
@@ -31,10 +31,16 @@ def main():
     sps= 16 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
 
-    #Wiener Filter length parameters:
+    #DD Phase Recovery Parameters:
     frac = 0.05
 
-    snr_begin = 7
+    #BPS Phase Recovery Parameters:
+    N=5 #Number of symbols to average over
+    #"N = 6,..,10 will be a fairly good choice" - Pfau paper
+    B=10 #Number of trial angles
+
+    snr_begin = 8
+    
 
     toggle_RRC = False #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -108,15 +114,11 @@ def main():
         Phase_Noise_rx, theta = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, toggle=toggle_phasenoise)
         
         filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
-        
-        #These need to be adjusted based on linewidth
-        N=5
-        B=10
-        
+
         if(toggle_BPS==True):
             Phase_Noise_compensated, thetaHat = f.BPS(filtered_signal,Modbits,N,B, toggle_phasenoisecompensation)
         else:
-            Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
+            Phase_Noise_compensated, thetaHat = t.DD_phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
 
         downsampled_rx = f.downsample(Phase_Noise_compensated, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
 
@@ -139,14 +141,14 @@ def main():
         #Only plot some of the results:
         if(i%3==0):
 
-            f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
+            f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation \n SNR = {snr_dbi}dB', lim=plotsize)
             
 
             if(toggle_plotuncompensatedphase==True):
                 f.plot_constellation(axs3[i//3], filtered_signal[1::sps], title=f'No Derotation at SNR= {snr_dbi}dB', lim=plotsize)
             
             axs4[i//3].plot(np.arange(num_symbols*sps), theta, label='Phase')
-            axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB')
+            axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB \n Linewidth = {maxDvT}')
             axs4[i//3].grid(True)
 
             axs4[i//3].plot(np.arange(num_symbols*sps), thetaHat, color='red', label='Phase Estimate')
