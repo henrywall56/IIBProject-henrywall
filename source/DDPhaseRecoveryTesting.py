@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from scipy.signal import convolve
 import functions as f
 
+
+#Decision Directed Phase Recovery Testing
 def soft_phase_estimator(y, sps, Rs, Linewidth, snrb_db, Modbits, frac):
     #SOFT-DECISION PHASE-ESTIMATOR:
     #transmitted symbols x

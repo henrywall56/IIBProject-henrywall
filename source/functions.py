@@ -160,22 +160,24 @@ def pulseshaping(symbols, sps, RRCimpulse, toggle):
         return symbols
 
 @benchmark(enable_benchmark)
-def add_noise(signal, snrb_db, sps, Modbits): 
+def add_noise(signal, snrb_db, sps, Modbits, toggle_AWGNnoise): 
     #addition of circular Gaussian noise to transmitted signal
     #snrb_db snr per bit in dB in transmitted signal
     #Modbits per symbol eg 16QAM or 64QAM etc.
     #sps samples per symbol
+    if(toggle_AWGNnoise==True):
+        snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
-    snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
+        stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
 
-    stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
+        
 
-    
-
-    noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
+        noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
 
 
-    return signal + noise 
+        return signal + noise 
+    else:
+        return signal
 
 @benchmark(enable_benchmark)
 def matched_filter(signal, pulse_shape, toggle):
@@ -415,4 +417,259 @@ def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, toggle):
     else:
         return symbols, np.zeros(len(symbols))
     
+def convmtx(vector, L):
+    """
+    Create a convolution matrix from the input vector with length L.
+    
+    Parameters:
+    - vector: 1D array (input vector)
+    - L: Length of the desired convolution matrix
+    
+    Returns:
+    - Convolution matrix
+    """
+    # Get the length of the input vector
+    N = len(vector)
+    
+    # Create a matrix with zero padding on the left and right
+    result = np.zeros((L, N + L - 1),dtype=complex)
+    
+    for i in range(L):
+        result[i, i:i+N] = vector  # Fill the matrix with shifted vector
+    
+    return result
 
+
+
+def BPS(z,Modbits,N,B, toggle_phasenoisecompensation):
+    #Blind Phase Search Phase compensation
+    #z is received signal to derotate
+    #Modbits defines the QAM format
+    #N is number of past and future symbols used in the BPS algorithm for phase noise estimation. 
+    #Total number of symbols used in BPS = L = 2N+1
+    #B is number of test rotations
+
+    if(toggle_phasenoisecompensation==True):
+        # Parameters
+        p = np.pi / 2
+        L = 2 * N + 1
+
+        # Test carrier phase angles
+        b = np.arange(-B//2, B//2)
+        ThetaTest = p * b / B #B rotation angles
+
+        #This should be 
+        ThetaTestMatrix = np.tile(np.exp(-1j*ThetaTest),(L,1)) #L row x B column matrix, each row is phase angle vector
+
+        zB_V = np.concatenate([np.zeros(L // 2, dtype=complex), z, np.zeros(L // 2, dtype=complex)])
+        zB_V = convmtx(zB_V,L)
+        
+        zB_V = np.flipud(zB_V[:, L:-L+1])
+
+        zBlocks = zB_V
+        
+        ThetaPU = np.zeros(zBlocks.shape[1]+1)
+        ThetaPrev = 0.0
+        #Phase noise estimates
+        for i in range(zBlocks.shape[1]): #Over columns
+            
+            zrot = np.tile(zBlocks[:, i][:, np.newaxis],(1,B)) * ThetaTestMatrix #ith column repeated 
+            zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1]), dtype=complex)
+
+            for j in range(zrot.shape[0]): #Decision of rotated symbols
+                zrot_decided[j,:] = max_likelihood_decision(zrot[j,:], Modbits)
+
+            #intermediate sum to be minimised
+            m = np.sum(abs(zrot-zrot_decided)**2,0)
+            
+            #estimating phase noise as angle that minimises m
+            im = np.argmin(m)
+
+            Theta = np.reshape(ThetaTest[im], 1)
+            
+            ThetaPU[i] = Theta + np.floor(0.5-(Theta-ThetaPrev)/p)*p
+
+            ThetaPrev = ThetaPU[i]
+        ThetaPU[-1]=ThetaPrev
+        v = z*np.exp(-1j*ThetaPU)
+
+        return v, ThetaPU
+        
+    else:
+        return z, np.zeros(z)
+
+def invert(nparr):
+    #Note input MUST be a numpy array
+    #Same as ~ NOT in Matlab, for array of ones and zeros
+    return 1-nparr
+   
+def Differential_Encoding_qpsk(bits):
+    #Differential Encoding of QPSK
+    Modbits = 2
+
+    #Bits that define the quadrant:
+    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
+    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
+
+     #Defining the quadrant:
+    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
+
+    #Initial Quadrant:
+    QuadPrev = 1
+
+    #Modulation
+    x = np.zeros(len(Quad), dtype=complex)
+    
+    for i in range(len(x)):
+        x[i] = QuadPrev * Quad[i] * (1+1j)
+        QuadPrev = QuadPrev * Quad[i]
+
+    x = x/np.sqrt(2)
+
+    return x
+
+def Differential_Encoding_16qam(bits):
+    #Differential Encoding of 16-QAM
+    Modbits = 4
+
+    #Bits that define the quadrant:
+    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
+    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
+
+    #Bits that define the symbols inside the quadrant:
+    InQuadBits1 = np.array(bits[2:len(bits):Modbits], dtype=np.int64)
+    InQuadBits2 = np.array(bits[3:len(bits):Modbits], dtype=np.int64)
+
+    #Defining the quadrant:
+    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
+    
+    #Defining the symbol inside the quadrants:
+    InQuadI = 2*InQuadBits1+ 1
+    InQuadQ = 2*InQuadBits2 + 1
+    InQuadSymbol = InQuadI + 1j*InQuadQ
+
+    #Initial Quadrant
+    QuadPrev = 1
+
+    #Modulation
+    x = np.zeros(len(InQuadBits2), dtype=complex)
+    
+    for i in range(len(x)):
+        x[i] = QuadPrev * Quad[i] * InQuadSymbol[i]
+        QuadPrev = QuadPrev * Quad[i]
+
+    normalised_x = x/np.sqrt(10)
+
+    return normalised_x
+
+def Differential_Encoding_64qam(bits):
+    #Differential Encoding of 64-QAM
+    Modbits = 6
+
+def Differential_decode_symbols(symbols, Modbits):
+    #Differential decoding of symbols to bits
+    QPrev = 0
+    Decided = np.zeros((len(symbols), Modbits), dtype=int)
+    if(Modbits==2):
+        #Decision Regions for In-Phase component
+        R1 = np.real(symbols) >= 0
+        R2 = np.real(symbols) < 0
+        #Decision Regions for Quadrature component
+        R3 = np.imag(symbols) >= 0
+        R4 = np.imag(symbols) < 0
+        
+
+        #Defining the quadrant:
+        Q = np.zeros(len(symbols), dtype=int)
+        # Assign values based on conditions
+        Q[R1 & R3] = 0  # Set Q to 0 where R1 and R3 are True
+        Q[R2 & R3] = 1  # Set Q to 1 where R2 and R3 are True
+        Q[R2 & R4] = 2  # Set Q to 2 where R2 and R4 are True
+        Q[R1 & R4] = 3  # Set Q to 3 where R1 and R4 are True
+        #Now Q contains the value of the Qudrant that each symbol is in
+
+        for i in range(len(symbols)):
+            QRx = Q[i] - QPrev
+            #Bits defining the quadrant (and consequently the symbol)
+            if QRx == 0:
+                Decided[i, 0] = 0
+                Decided[i, 1] = 0
+            elif QRx in {1, -3}:
+                Decided[i, 0] = 0
+                Decided[i, 1] = 1
+            elif QRx in {3, -1}:
+                Decided[i, 0] = 1
+                Decided[i, 1] = 0
+            elif QRx in {2, -2}:
+                Decided[i, 0] = 1
+                Decided[i, 1] = 1
+            
+            QPrev = Q[i]
+        
+        Decided = np.array(Decided).flatten()
+
+        return Decided
+
+    elif(Modbits==4):
+        #Decision Regions for In-Phase component
+        R1 = np.real(symbols) >= 2/np.sqrt(10)
+        R2 = np.real(symbols) >= 0
+        R3 = np.real(symbols) < 0
+        R4 = np.real(symbols) <= -2/np.sqrt(10)
+        #Decision Regions for Quadrature component
+        R5 = np.imag(symbols) >= 2/np.sqrt(10)
+        R6 = np.imag(symbols) >= 0
+        R7 = np.imag(symbols) < 0
+        R8 = np.imag(symbols) <= -2/np.sqrt(10)  
+        
+        #Defining the quadrant
+        Q = np.zeros(len(symbols), dtype=int)
+        Q[R1 & R5 | R1&R6&~R5 | ~R1&R2&R5 | ~R1&R2&R6&~R5] = 0  
+        Q[~R4&R3&R5 | ~R4&R3&R6&~R5 | R4&R5 | R4&R6&~R5] = 1
+        Q[R4&R7&~R8 | R4&R8 | ~R4&R3&R7&~R8 | ~R4&R3&R8] = 2
+        Q[~R1&R2&R7&~R8 | ~R1&R2&R8 | R1&R7*~R8 | R1&R8] = 3
+
+        #Defining the symbol inside the quadrants:
+        S = np.zeros(len(symbols), dtype=int)
+        S[~R1&R2&~R5&R6 | ~R1&R2&~R8&R7 | ~R4&R3&~R5&R6 | ~R4&R3&~R8&R7] = 0
+        S[~R1&R2&R5 | R4&R6&~R5 | ~R4&R3&R8 | R1&R7&~R8] = 1
+        S[R1&R6&~R5 | R4&R7&~R8 | ~R4&R3&R5 | ~R1&R2&R8] = 2
+        S[R1&R5 | R1&R8 | R4&R5 | R4&R8] = 3
+
+        #Received binary sequence
+        for i in range(len(symbols)):
+            QRx = Q[i] - QPrev
+            if QRx == 0:
+                Decided[i,0] = 0
+                Decided[i,1] = 0
+            elif QRx in {1,-3}:
+                Decided[i,0] = 0
+                Decided[i,1] = 1
+            elif QRx in {3,-1}:
+                Decided[i,0] = 1
+                Decided[i,1] = 0
+            elif QRx in {2,-2}:
+                Decided[i,0] = 1
+                Decided[i,1] = 1
+        
+            QPrev = Q[i]
+
+            if S[i]==0:
+                Decided[i,2] = 0
+                Decided[i,3] = 0
+            elif S[i] == 1:
+                Decided[i,2] = 0
+                Decided[i,3] = 1
+            elif S[i] == 2:
+                Decided[i,2] = 1
+                Decided[i,3] = 0
+            elif S[i] == 3:
+                Decided[i,2] = 1
+                Decided[i,3] = 1
+        
+        Decided = np.array(Decided).flatten()
+
+        return Decided
+
+    elif(Modbits==6):
+        x=1
