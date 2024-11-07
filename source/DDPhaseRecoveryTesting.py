@@ -106,7 +106,7 @@ def generate_Wiener_parameters(sps, Rs, Linewidth, snrb_db, Modbits, frac):
 
     return r, alpha, L
 
-def phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, toggle_phasenoisecompensation):
+def DD_phase_noise_compensation(rx, sps, Rs, Linewidth, Modbits, snrb_db, frac, toggle_phasenoisecompensation):
     #rx: Received signal
     #sps: Samples per symbol
     #Rs: symbol rate symbols/second
