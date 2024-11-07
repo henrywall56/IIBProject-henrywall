@@ -2,20 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import functions as f
 import DDPhaseRecoveryTesting as t
-import BPSPhaseRecoveryTesting as b
-"""
-TO DO:
-    -probatilistic shaping
-        -where does it come in (tx and rx) - papers been sent
-            - https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8640810&tag=1
-            - https://www.nowpublishers.com/article/DownloadSummary/CIT-111
-            - https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7322261
-            -CCDM
-        -how to implement
 
-    -toggle in code for RRC & matched filter or not (with sps set to 1)
-    -FPGA?
-"""
 """
 1) Generate random bits.
 2) Generate QAM symbols from bits.
@@ -31,11 +18,11 @@ TO DO:
 
 """
 def main():
-    num_symbols = 1000
+    num_symbols = 10000
     
     Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    maxDvT = 2/(10**4) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    maxDvT = 1/(10**4) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
     Linewidth = 10**5 #Linewidth of laser in Hz
     
     #Generate RRC filter impulse response
@@ -47,11 +34,16 @@ def main():
     #Wiener Filter length parameters:
     frac = 0.05
 
-    toggle_RRC = False #true means on
-    toggle_phasenoise = True #true means on
-    toggle_phasenoisecompensation = True #true means on
-    toggle_plotuncompensatedphase = True #true means on
-    toggle_ploterrorindexes = True #true means on
+    snr_begin = 7
+
+    toggle_RRC = False #toggle RRC pulse shaping
+    toggle_AWGNnoise = True
+    toggle_phasenoise = True #toggle phase noise
+    toggle_phasenoisecompensation = True #toggle phase noise compensation
+    toggle_plotuncompensatedphase = True #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
+    toggle_ploterrorindexes = True #toggle plotting error indexes on phase plot
+    toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
+    toggle_DE = True #toggle Differential Encoding
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -60,24 +52,34 @@ def main():
     #T = 1/(Rs*sps)
     Rs = Linewidth/(sps*maxDvT) #Rs symbol rate symbols/second
     
-    original_bits = np.random.randint(0, 2, size=num_symbols * Modbits)  
+    original_bits = np.random.randint(0, 2, size=num_symbols * Modbits) 
 
-
-    # Generate symbols
-    if(Modbits==2): #16QAM
-        symbols = f.generate_QPSK_symbols(original_bits)
-        plotsize = 2
-        snr_begin=5
-    elif(Modbits==4): #16QAM
-        symbols = f.generate_16qam_symbols(original_bits)
-        plotsize = 2
-        snr_begin=10
-    elif(Modbits==6): #64QAM
-        symbols = f.generate_64qam_symbols(original_bits) 
-        plotsize = 1.5
-        snr_begin=10
-    
-    
+    if(toggle_DE==False):
+        # Generate symbols
+        if(Modbits==2): #QPSK
+            symbols = f.generate_QPSK_symbols(original_bits)
+            plotsize = 2
+            
+        elif(Modbits==4): #16QAM
+            symbols = f.generate_16qam_symbols(original_bits)
+            plotsize = 2
+            
+        elif(Modbits==6): #64QAM
+            symbols = f.generate_64qam_symbols(original_bits) 
+            plotsize = 1.5
+    else:
+        # Generate symbols using differential encoding
+        if(Modbits==2): #16QAM
+            symbols = f.Differential_Encoding_qpsk(original_bits)
+            plotsize = 2
+            
+        elif(Modbits==4): #16QAM
+            symbols = f.Differential_Encoding_16qam (original_bits)
+            plotsize = 2
+            
+        elif(Modbits==6): #64QAM
+            symbols = f.Differential_Encoding_64qam(original_bits) 
+            plotsize = 1.5
 
     RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
@@ -88,6 +90,7 @@ def main():
 
     fig1, axs1 = plt.subplots(2, 2, figsize=(8, 8))  
     axs1 = axs1.flatten()  # Flatten the array for easy indexing
+
     if(toggle_plotuncompensatedphase==True):
         fig3, axs3 = plt.subplots(2, 2, figsize=(8, 8))  
         axs3= axs3.flatten()  # Flatten the array for easy indexing
@@ -100,29 +103,35 @@ def main():
 
     for i, snr_dbi in enumerate(snr_db):
         print(f'Processing SNR {snr_dbi}')
-        Gaussian_noise_rx = f.add_noise(tx, snr_dbi, sps, Modbits)
+        Gaussian_noise_rx = f.add_noise(tx, snr_dbi, sps, Modbits, toggle_AWGNnoise)
 
         Phase_Noise_rx, theta = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, toggle=toggle_phasenoise)
         
         filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
         
-        #Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
+        #These need to be adjusted based on linewidth
+        N=5
+        B=10
         
-        N=20
-        B=100
-        Phase_Noise_compensated, thetaHat = b.BPS(filtered_signal,Modbits,N,B, toggle_phasenoisecompensation)
+        if(toggle_BPS==True):
+            Phase_Noise_compensated, thetaHat = f.BPS(filtered_signal,Modbits,N,B, toggle_phasenoisecompensation)
+        else:
+            Phase_Noise_compensated, thetaHat = t.phase_noise_compensation(filtered_signal, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
+
         downsampled_rx = f.downsample(Phase_Noise_compensated, sps, toggle=toggle_RRC) #if toggle is False, this function returns input
 
-        demod_symbols = f.max_likelihood_decision(downsampled_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
-
-        # Find erroneous symbol indexes
-        erroneous_indexes = np.where(symbols != demod_symbols)[0]
-
-        #print(erroneous_indexes) #plot where errors are
-
-        SER[i] = np.mean(symbols != demod_symbols)
-    
-        demod_bits = f.decode_symbols(demod_symbols, Modbits) #pass in Modbits which says 16QAM or 64QAM
+        if(toggle_DE==True):
+            demod_bits = f.Differential_decode_symbols(downsampled_rx, Modbits)
+            #Plot erroneous symbols as the symbols that correspond to bit errors
+            erroneous_bit_indexes = np.where(original_bits!=demod_bits)[0]
+        else:
+            demod_symbols = f.max_likelihood_decision(downsampled_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
+            # SER only has meaning if Differential Encoding is NOT used 
+            # Find erroneous symbol indexes
+            erroneous_indexes = np.where(symbols != demod_symbols)[0]
+            SER[i] = np.mean(symbols != demod_symbols)
+        
+            demod_bits = f.decode_symbols(demod_symbols, Modbits) #pass in Modbits which says 16QAM or 64QAM
 
         BER[i] = np.mean(original_bits != demod_bits)
 
@@ -131,8 +140,7 @@ def main():
         if(i%3==0):
 
             f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation at SNR = {snr_dbi}dB', lim=plotsize)
-                    # Highlight erroneous symbols
-            axs1[i//3].scatter(downsampled_rx[erroneous_indexes].real, downsampled_rx[erroneous_indexes].imag, color='red', label='Errors', alpha=0.5)
+            
 
             if(toggle_plotuncompensatedphase==True):
                 f.plot_constellation(axs3[i//3], filtered_signal[1::sps], title=f'No Derotation at SNR= {snr_dbi}dB', lim=plotsize)
@@ -143,33 +151,53 @@ def main():
 
             axs4[i//3].plot(np.arange(num_symbols*sps), thetaHat, color='red', label='Phase Estimate')
             
-
-            if(toggle_ploterrorindexes==True):
-                axs4[i//3].vlines(erroneous_indexes*sps, ymin=-0.01, ymax=0.01, colors='g', alpha=0.2, label='Erroneous Indexes')
+            if(toggle_DE==False):
+                if(toggle_ploterrorindexes==True):
+                    axs4[i//3].vlines(erroneous_indexes*sps, ymin=-0.05, ymax=0.05, colors='g', alpha=0.2, label='Erroneous Indexes')
+                # Highlight erroneous symbols
+                axs1[i//3].scatter(downsampled_rx[erroneous_indexes].real, downsampled_rx[erroneous_indexes].imag, color='red', label='Errors', alpha=0.5)
+            else:
+                axs4[i//3].vlines(erroneous_bit_indexes*sps//Modbits, ymin=-0.05, ymax=0.05, colors='g', alpha=0.2, label='Erroneous Indexes')
+                axs1[i//3].scatter(downsampled_rx[erroneous_bit_indexes//Modbits].real, downsampled_rx[erroneous_bit_indexes//Modbits].imag, color='red', label='Errors', alpha=0.5)
+                #Highlight rough location of symbol errors
             axs4[i//3].legend(loc='lower left')
-
+        
     plt.tight_layout()
     plt.show()
+    if(toggle_DE==True):
+        #SER has no meaning for Differential Encoding
+        # Plot BER
+        plt.plot()
+        plt.semilogy(snr_db, BER, marker='o')
+        plt.xlabel('SNR per bit/ dB')
+        plt.ylabel('BER')
+        plt.title('Bit Error Rate (BER)')
+        plt.grid(True)
 
-    fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))  
-    axs2 = axs2.flatten()  # Flatten the array for easy indexing
-    # Plot SER
-    axs2[0].semilogy(snr_db, SER, marker='o')
-    axs2[0].set_xlabel('SNR per bit/ dB')
-    axs2[0].set_ylabel('SER')
-    axs2[0].set_title('Symbol Error Rate (SER)')
-    axs2[0].grid(True)
+    else:
+        fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))  
+        axs2 = axs2.flatten()  # Flatten the array for easy indexing   
 
-    # Plot BER
-    axs2[1].semilogy(snr_db, BER, marker='o')
-    axs2[1].set_xlabel('SNR per bit/ dB')
-    axs2[1].set_ylabel('BER')
-    axs2[1].set_title('Bit Error Rate (BER)')
-    axs2[1].grid(True)
+        # Plot BER
+        axs2[1].plot()
+        axs2[1].semilogy(snr_db, BER, marker='o')
+        axs2[1].set_xlabel('SNR per bit/ dB')
+        axs2[1].set_ylabel('BER')
+        axs2[1].set_title('Bit Error Rate (BER)')
+        axs2[1].grid(True)        
+        # Plot SER
+        axs2[0].semilogy(snr_db, SER, marker='o')
+        axs2[0].set_xlabel('SNR per bit/ dB')
+        axs2[0].set_ylabel('SER')
+        axs2[0].set_title('Symbol Error Rate (SER)')
+        axs2[0].grid(True)
+
+
     plt.tight_layout()
     plt.show()
 
     """
+    #For Testing:
     # Create a figure for constellation plots
     fig0, axs0 = plt.subplots(3, 2, figsize=(15, 10))  
     axs0 = axs0.flatten()  # Flatten the array for easy indexing
@@ -186,7 +214,6 @@ def main():
     plt.tight_layout()
     plt.show()
     """
-
 
 if __name__ == "__main__":
     main()
