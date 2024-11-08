@@ -857,3 +857,28 @@ def Differential_decode_symbols(symbols, Modbits):
         Decided = np.array(Decided).flatten()
         return Decided
     
+@benchmark(enable_benchmark)
+def frequency_recovery(y, Rs, toggle_frequencyrecovery):
+    #y is input signal. y must be obtained with one sample per symbol
+    # Rs is symbol rate in symbols/second
+    if(toggle_frequencyrecovery):
+        f = np.arange(-1/2 + 1/len(y), 1/2, 1/len(y))*Rs
+        Ts = 1/Rs
+
+        signal_power_4 = y** 4
+
+        # Compute the FFT and take the absolute value
+        spectrum = np.fft.fft(signal_power_4)
+
+        # Shift the zero frequency component to the center
+        SignalSpectrum = np.fft.fftshift(np.abs(spectrum))
+
+        max_index = np.argmax(SignalSpectrum)  # Find the index of the maximum value
+        Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
+
+        k = np.arange(len(y))
+        z = y*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
+
+        return z, Delta_f
+    else:
+        return y, 0
