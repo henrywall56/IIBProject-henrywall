@@ -18,11 +18,11 @@ import DDPhaseRecoveryTesting as t
 
 """
 def main():
-    num_symbols = 10000
+    num_symbols = 1000
     
     Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    maxDvT = 1/(10**5) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    maxDvT = 1.4/(10**5) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
     Linewidth = 10**5 #Linewidth of laser in Hz
     
     #Generate RRC filter impulse response
@@ -35,12 +35,21 @@ def main():
     frac = 0.05
 
     #BPS Phase Recovery Parameters:
-    N=5 #Number of symbols to average over
+    N=6 #Number of symbols to average over
     #"N = 6,..,10 will be a fairly good choice" - Pfau paper
-    B=10 #Number of trial angles
 
-    snr_begin = 8
-    
+    if(Modbits==2): #Values given by Pfau paper
+        B=32 #Number of trial angles
+    elif(Modbits==4):
+        B=32 #Number of trial angles
+    elif(Modbits==6):
+        B=64 #Number of trial angles
+
+    #Overwriting for quick testing:
+    B=10
+    N=5
+
+    snr_begin = 10
 
     toggle_RRC = False #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -50,6 +59,7 @@ def main():
     toggle_ploterrorindexes = True #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
     toggle_DE = True #toggle Differential Encoding
+    toggle_frequencyrecovery = True #toggle Frequency Recovery
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -89,7 +99,7 @@ def main():
 
     RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
-        #Pulse shaping with RRC filter
+    #Pulse shaping with RRC filter
     tx = f.pulseshaping(symbols, sps, RRCimpulse, toggle = toggle_RRC) #if toggle False, this function just returns symbols
 
     snr_db = np.arange(snr_begin,snr_begin+10,1)
@@ -113,7 +123,11 @@ def main():
 
         Phase_Noise_rx, theta = f.add_phase_noise(Gaussian_noise_rx, num_symbols, sps, Rs, Linewidth, toggle=toggle_phasenoise)
         
-        filtered_signal = f.matched_filter(Phase_Noise_rx, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
+        frequency_recovered, Delta_f = f.frequency_recovery(Phase_Noise_rx, Rs, toggle_frequencyrecovery)
+
+        print(f'Delta_f from frequency recovery: {Delta_f}Hz')
+        
+        filtered_signal = f.matched_filter(frequency_recovered, RRCimpulse, toggle=toggle_RRC) #if toggle is False, this function returns input
 
         if(toggle_BPS==True):
             Phase_Noise_compensated, thetaHat = f.BPS(filtered_signal,Modbits,N,B, toggle_phasenoisecompensation)
@@ -143,14 +157,13 @@ def main():
 
             f.plot_constellation(axs1[i//3], downsampled_rx, title=f'Downsampled Constellation \n SNR = {snr_dbi}dB', lim=plotsize)
             
-
             if(toggle_plotuncompensatedphase==True):
                 f.plot_constellation(axs3[i//3], filtered_signal[1::sps], title=f'No Derotation at SNR= {snr_dbi}dB', lim=plotsize)
-            
+
             axs4[i//3].plot(np.arange(num_symbols*sps), theta, label='Phase')
+            #Note plotting theta before frequnecy recovery here
             axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB \n Linewidth = {maxDvT}')
             axs4[i//3].grid(True)
-
             axs4[i//3].plot(np.arange(num_symbols*sps), thetaHat, color='red', label='Phase Estimate')
             
             if(toggle_DE==False):
