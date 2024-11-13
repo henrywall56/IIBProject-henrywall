@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import convolve #upfirdn for up/down sampling
 import time
-
+from scipy.fft import fft, ifft, fftshift, ifftshift
 
 #References: Digital Coherent Optical Systems Textbook, Matlab Code, page 38
 
@@ -207,7 +207,7 @@ def plot_constellation(ax, symbols, title, lim=2):
 def downsample(signal, sps, toggle):
     if(toggle==True):
         #downsample a signal that has sps samples per symbol
-        downsampled = signal[1::sps]
+        downsampled = signal[0::sps]
         return downsampled
     else:
         return signal
@@ -861,7 +861,7 @@ def Differential_decode_symbols(symbols, Modbits):
 def frequency_recovery(y, Rs, toggle_frequencyrecovery):
     #y is input signal. y must be obtained with one sample per symbol
     # Rs is symbol rate in symbols/second
-    if(toggle_frequencyrecovery):
+    if(toggle_frequencyrecovery==True):
         f = np.arange(-1/2 + 1/len(y), 1/2, 1/len(y))*Rs
         Ts = 1/Rs
 
@@ -878,7 +878,38 @@ def frequency_recovery(y, Rs, toggle_frequencyrecovery):
 
         k = np.arange(len(y))
         z = y*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
-
-        return z, Delta_f
+        
+        print(f'Delta_f from frequency recovery: {Delta_f}Hz')
+        return z
     else:
-        return y, 0
+        return y
+    
+@benchmark(enable_benchmark)
+def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, toggle):
+    #symbols: to be transmittes
+    #sps: samples per symbol
+    #Rs: symbol rate in (symbols/s)
+    #D: Dispersion parameter in (ps/(nm x km))
+    #CLambda: Central lambda in (m)
+    #L: Fibre length in (m)
+
+    if(toggle==False):
+        return symbols
+    else:
+
+        c = 299792458 #speed of light
+
+        #Dispersion
+        D = D*(1/10**12)/((1/10**9)*1000) #scale to m
+
+        #Frequency vector:
+        w = 2 * np.pi * (np.arange(-1/2, 1/2, 1/len(symbols))) * sps * Rs
+
+        #Calculating the CD frequency response:
+        G = np.exp(1j * ((D*Clambda**2)/(4*np.pi*c))*L*(w**2)) #Quadratic phase shift
+
+        output = ifft(ifftshift(G * fftshift(fft(symbols))))
+
+        return output
+
+        #fft shift w first then don't have to do double shift - fft wants it to look like this - better way to define
