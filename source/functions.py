@@ -22,6 +22,17 @@ def benchmark(enabled=enable_benchmark):
     return decorator
 
 @benchmark(enable_benchmark)
+def generate_original_bits(num_symbols, Modbits, NPol):
+    #If NPol == 1: generate 1D array of bits
+    #If NPol == 2: generate 2D array of bits
+    bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
+
+    if(NPol==2):
+        # Reshape it into a 2D array
+        bits = bits.reshape(2,num_symbols*Modbits)
+    return bits
+
+@benchmark(enable_benchmark)
 def generate_QPSK_symbols(bits):
     # QPSK is 2 bits/symbol, so create array of blocks of 4 bits
     # Mapping dictionary for 16QAM symbols
@@ -141,53 +152,251 @@ def generate_64qam_symbols(bits):
     ])
     return symbols/np.sqrt(42)    
 
+
+def invert(nparr):
+    #Note input MUST be a numpy array
+    #Same as ~ NOT in Matlab, for array of ones and zeros
+    return 1-nparr
+
+@benchmark(enable_benchmark)  
+def Differential_Encoding_qpsk(bits):
+    #Differential Encoding of QPSK
+    Modbits = 2
+    #Bits that define the quadrant:
+    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
+    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
+
+     #Defining the quadrant:
+    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
+
+    #Initial Quadrant:
+    QuadPrev = 1
+
+    #Modulation
+    x = np.zeros(len(Quad), dtype=complex)
+    
+    for i in range(len(x)):
+        x[i] = QuadPrev * Quad[i] * (1+1j)
+        QuadPrev = QuadPrev * Quad[i]
+
+    x = x/np.sqrt(2)
+
+    return x
+
 @benchmark(enable_benchmark)
-def pulseshaping(symbols, sps, RRCimpulse, toggle):
+def Differential_Encoding_16qam(bits):
+    #Differential Encoding of 16-QAM
+    Modbits = 4
+
+    #Bits that define the quadrant:
+    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
+    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
+
+    #Bits that define the symbols inside the quadrant:
+    InQuadBits1 = np.array(bits[2:len(bits):Modbits], dtype=np.int64)
+    InQuadBits2 = np.array(bits[3:len(bits):Modbits], dtype=np.int64)
+
+    #Defining the quadrant:
+    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
+    
+    #Defining the symbol inside the quadrants:
+    InQuadI = 2*InQuadBits1+ 1
+    InQuadQ = 2*InQuadBits2 + 1
+    InQuadSymbol = InQuadI + 1j*InQuadQ
+
+    #Initial Quadrant
+    QuadPrev = 1
+
+    #Modulation
+    x = np.zeros(len(InQuadBits2), dtype=complex)
+    
+    for i in range(len(x)):
+        x[i] = QuadPrev * Quad[i] * InQuadSymbol[i]
+        QuadPrev = QuadPrev * Quad[i]
+
+    normalised_x = x/np.sqrt(10)
+
+    return normalised_x
+
+@benchmark(enable_benchmark)
+def Differential_Encoding_64qam(bits):
+    #Differential Encoding of 64-QAM
+    Modbits = 6
+
+    #Bits that define the quadrant:
+    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
+    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
+
+    #Bits that define the symbols inside the quadrant:
+    InQuadBits1 = np.array(bits[2:len(bits):Modbits], dtype=np.int64)
+    InQuadBits2 = np.array(bits[3:len(bits):Modbits], dtype=np.int64)
+    InQuadBits3 = np.array(bits[4:len(bits):Modbits], dtype=np.int64)
+    InQuadBits4 = np.array(bits[5:len(bits):Modbits], dtype=np.int64)
+
+    #Defining the quadrant:
+    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
+    
+    #Defining the symbol inside the quadrants:
+    InQuadI = 7 - (InQuadBits1&invert(InQuadBits2))*2 - (InQuadBits1&InQuadBits2)*4 - (invert(InQuadBits1)&InQuadBits2)*6 
+    InQuadQ = 7 - (InQuadBits3&invert(InQuadBits4))*2 - (InQuadBits3&InQuadBits4)*4 - (invert(InQuadBits3)&InQuadBits4)*6 
+    InQuadSymbol = InQuadI + 1j*InQuadQ
+
+    #Initial Quadrant
+    QuadPrev = 1
+
+    #Modulation
+    x = np.zeros(len(InQuadBits2), dtype=complex)
+    
+    for i in range(len(x)):
+        x[i] = QuadPrev * Quad[i] * InQuadSymbol[i]
+        QuadPrev = QuadPrev * Quad[i]
+
+    normalised_x = x/np.sqrt(42)
+
+    return normalised_x
+
+@benchmark(enable_benchmark)
+def generate_symbols(original_bits, Modbits, NPol, toggle_DE):
+    #Wrapper for symbols generation
+    #NPol is number of polarisations used
+
+    if(NPol==1):
+        if(toggle_DE==False):
+            # Generate symbols
+            if(Modbits==2): #QPSK
+                symbols = generate_QPSK_symbols(original_bits)
+        
+            elif(Modbits==4): #16QAM
+                symbols = generate_16qam_symbols(original_bits)
+                
+            elif(Modbits==6): #64QAM
+                symbols = generate_64qam_symbols(original_bits) 
+                
+        else:
+            # Generate symbols using differential encoding
+            if(Modbits==2): #16QAM
+                symbols = Differential_Encoding_qpsk(original_bits)
+                
+                
+            elif(Modbits==4): #16QAM
+                symbols = Differential_Encoding_16qam (original_bits)
+                
+                
+            elif(Modbits==6): #64QAM
+                symbols = Differential_Encoding_64qam(original_bits) 
+
+    elif(NPol==2):
+        if(toggle_DE==False):
+            # Generate symbols
+            if(Modbits==2): #QPSK
+                symbols0 = generate_QPSK_symbols(original_bits[0,:])
+                symbols1 = generate_QPSK_symbols(original_bits[1,:])
+        
+            elif(Modbits==4): #16QAM
+                symbols0 = generate_16qam_symbols(original_bits[0,:])
+                symbols1 = generate_16qam_symbols(original_bits[1,:])
+
+            elif(Modbits==6): #64QAM
+                symbols0 = generate_64qam_symbols(original_bits[0,:]) 
+                symbols1 = generate_64qam_symbols(original_bits[1,:])
+        else:
+            # Generate symbols using differential encoding
+            if(Modbits==2): #16QAM
+                symbols0 = Differential_Encoding_qpsk(original_bits[0,:])
+                symbols1 = Differential_Encoding_qpsk(original_bits[1,:])
+                
+            elif(Modbits==4): #16QAM
+                symbols0 = Differential_Encoding_16qam (original_bits[0,:])
+                symbols1 = Differential_Encoding_16qam (original_bits[1,:])
+                
+            elif(Modbits==6): #64QAM
+                symbols0 = Differential_Encoding_64qam(original_bits[0,:]) 
+                symbols1 = Differential_Encoding_64qam(original_bits[1,:]) 
+        symbols = np.array([symbols0, symbols1])
+
+    return symbols
+
+
+@benchmark(enable_benchmark)
+def pulseshaping(symbols, sps, RRCimpulse, NPol, toggle):
     #performs pulse shaping of symbols with RRC filter. 
     #filter parameters are span and rolloff
     #sequence of symbols upsampled to sps samples per symbol then applied RRC filter
+    #Applies pulse shaping two NPol polarisations
     if(toggle==True):
-        #upsample the symbols by inserting (sps-1) zeros between each symbol
-        upsampled = np.zeros(sps*len(symbols), dtype=complex)
-        for i in range(0, sps*len(symbols), sps):
-            upsampled[i] = symbols[i//sps]
+        if(NPol==1):
+        
+            #upsample the symbols by inserting (sps-1) zeros between each symbol
+            upsampled = np.zeros(sps*len(symbols), dtype=complex)
+            for i in range(0, sps*len(symbols), sps):
+                upsampled[i] = symbols[i//sps]
 
-        shaped = convolve(upsampled, RRCimpulse, mode='same')
-        shaped = shaped/(np.sqrt(np.mean(abs(shaped)**2)))
+            shaped = convolve(upsampled, RRCimpulse, mode='same')
+            shaped = shaped/(np.sqrt(np.mean(abs(shaped)**2)))
 
-        return shaped
+            return shaped
+        elif(NPol==2):
+            #upsample the symbols by inserting (sps-1) zeros between each symbol
+            upsampled0 = np.zeros(sps*len(symbols[0]), dtype=complex)
+            upsampled1 = np.zeros(sps*len(symbols[0]), dtype=complex)
+            for i in range(0, sps*len(symbols[0]), sps):
+                upsampled0[i] = symbols[0][i//sps]
+                upsampled1[i] = symbols[1][i//sps]
+
+            shaped0 = convolve(upsampled0, RRCimpulse, mode='same')
+            shaped1 = convolve(upsampled1, RRCimpulse, mode='same')
+            shaped0 = shaped0/(np.sqrt(np.mean(abs(shaped0)**2)))
+            shaped1 = shaped1/(np.sqrt(np.mean(abs(shaped1)**2)))
+
+            return np.array([shaped0, shaped1])
+
     else:
         return symbols
 
 @benchmark(enable_benchmark)
-def add_noise(signal, snrb_db, sps, Modbits, toggle_AWGNnoise): 
+def add_noise(signal, snrb_db, sps, Modbits, NPol, toggle_AWGNnoise): 
     #addition of circular Gaussian noise to transmitted signal
     #snrb_db snr per bit in dB in transmitted signal
     #Modbits per symbol eg 16QAM or 64QAM etc.
     #sps samples per symbol
     if(toggle_AWGNnoise==True):
-        snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
+        if(NPol==1):
+            snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
-        stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
+            stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
+            noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
 
-        
+            return signal + noise 
+        elif(NPol==2):
+            snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
-        noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
+            stdev0= np.sqrt(np.mean(abs(signal[0])**2)*sps/(2*Modbits*snr))
+            stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*Modbits*snr))
+            noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))
+            noise1 = stdev1 * (np.random.randn(len(signal[1])) + 1j * np.random.randn(len(signal[1])))
 
+            return np.array([signal[0]+noise0, signal[1]+noise1], dtype=complex)
 
-        return signal + noise 
     else:
         return signal
 
 @benchmark(enable_benchmark)
-def matched_filter(signal, pulse_shape, toggle):
+def matched_filter(signal, pulse_shape, NPol, toggle):
     #received_signal is original signals + noise
     #pulse shape eg raised-root-cosine, square etc.
     if(toggle==True):
-        filtered = convolve(signal, pulse_shape, mode='same') 
-        filtered = filtered/(np.sqrt(np.mean(abs(filtered)**2)))
-        #should have peaks where received signal matches pulse shape, maximising SNR
-        return filtered
+        if(NPol==1):
+            filtered = convolve(signal, pulse_shape, mode='same') 
+            filtered = filtered/(np.sqrt(np.mean(abs(filtered)**2)))
+            #should have peaks where received signal matches pulse shape, maximising SNR
+            return filtered
+        elif(NPol==2):
+            filtered0 = convolve(signal[0], pulse_shape, mode='same') 
+            filtered0 = filtered0/(np.sqrt(np.mean(abs(filtered0)**2)))
+            filtered1= convolve(signal[1], pulse_shape, mode='same') 
+            filtered1 = filtered1/(np.sqrt(np.mean(abs(filtered1)**2)))
+            return np.array([filtered0, filtered1], dtype=complex)
+
     else:
         return signal
 
@@ -204,11 +413,16 @@ def plot_constellation(ax, symbols, title, lim=2):
     ax.axvline(0, color='black', lw=0.5)
 
 @benchmark(enable_benchmark)
-def downsample(signal, sps, toggle):
+def downsample(signal, sps, NPol, toggle):
     if(toggle==True):
-        #downsample a signal that has sps samples per symbol
-        downsampled = signal[0::sps]
-        return downsampled
+        if(NPol==1):
+            #downsample a signal that has sps samples per symbol
+            downsampled = signal[0::sps]
+            return downsampled
+        elif(NPol==2):
+            downsampled0 = signal[0][0::sps]
+            downsampled1 = signal[1][0::sps]
+            return np.array([downsampled0, downsampled1], dtype=complex)
     else:
         return signal
     
@@ -285,7 +499,7 @@ def max_likelihood_decision(rx_symbols, Modbits):
     return ML_symbols
 
 @benchmark(enable_benchmark)
-def decode_symbols(symbols, Modbits):
+def decode_symbols(symbols, Modbits, NPol):
     #turns symbols back to bitstream
     if(Modbits==2): #QPSK
         symbol_mapping = {
@@ -387,16 +601,27 @@ def decode_symbols(symbols, Modbits):
         root = 42
 
     reverse_mapping = {v: k for k, v in symbol_mapping.items()}
-    bits = np.zeros(len(symbols) * Modbits, dtype=int)
 
+    if(NPol==1):
+        bits = np.zeros(len(symbols) * Modbits, dtype=int)
+        for i, symbol in enumerate(symbols):
+            bits[i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(symbol.real*np.sqrt(root))+int(symbol.imag*np.sqrt(root))*1j] #bit stream
+        return bits
+    elif(NPol==2):
+        bits = np.zeros((NPol, len(symbols[0]) * Modbits), dtype=int)
+        
+        for i, symbol in enumerate(symbols[0]):
+            bits[0][i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(symbol.real*np.sqrt(root))+int(symbol.imag*np.sqrt(root))*1j] #bit stream
+        for i, symbol in enumerate(symbols[1]):
+            bits[1][i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(symbol.real*np.sqrt(root))+int(symbol.imag*np.sqrt(root))*1j] #bit stream
+        return bits
 
-    for i, symbol in enumerate(symbols):
-        bits[i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(symbol.real*np.sqrt(root))+int(symbol.imag*np.sqrt(root))*1j] #bit stream
-    return bits
 
 @benchmark(enable_benchmark)
 def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, toggle):
     #This function adds phase noise to the transmitted symbols, modelled by a Wiener Process.
+    #This approach only used when not considering physical process of electrical field of laser
+    #This function is no longer used
 
     #symbols: symbols sent
     #sps: samples per symbol
@@ -416,6 +641,114 @@ def add_phase_noise(symbols, Nsymb, sps, Rs, Linewidth, toggle):
         return rotated_symbols, theta
     else:
         return symbols, np.zeros(len(symbols))
+
+@benchmark(enable_benchmark)
+def Laser(laser_power, Linewidth, sps, Rs, num_symbols, NPol, toggle_phasenoise):
+    #Simulates a laser as a continuous wave optical source.
+    #Phase noise is inserted into the electrical field E
+    #laser_power: total laser power in dBm
+    #sps: samples per signal in oversampled signal
+    #Rs: symbol rate in symbols/second
+    #num_symbols: number of symbols transmitted in each polarisation
+    #Linedwith: of laser in Hz
+    #NPol: number of polarisations
+
+    laser_power_linear = 10**(-3) * (10**(laser_power/10))
+    if NPol == 1:
+        E = np.ones(sps*num_symbols, dtype=complex)*np.sqrt(laser_power_linear)
+    elif NPol == 2:
+        E = np.array([np.ones(sps*num_symbols, dtype=complex)*np.sqrt(laser_power_linear/2), np.ones(sps*num_symbols, dtype=complex)*np.sqrt(laser_power_linear/2)])
+    
+    if(toggle_phasenoise==True):
+        T = 1/(sps*Rs) #Period between samples at the oversampled transmit signal
+
+        #Calculating phase noise:
+        Var = 2*np.pi*Linewidth*T           
+        delta_theta = np.sqrt(Var)*np.random.randn(sps*num_symbols)
+        theta = np.cumsum(delta_theta) #an array of phase shift vs time
+        if(NPol==1):
+            Erot = E*np.exp(1j*theta)
+        elif(NPol==2):
+            Erot = np.array([E[0]*np.exp(1j*theta), E[1]*np.exp(1j*theta)], dtype=complex)
+        
+        return Erot, theta
+    
+    else:
+        return E, np.zeros(sps*num_symbols)
+
+@benchmark(enable_benchmark)
+def IQModulator(symbols, Einput, Vpi, Bias, MaxExc, MinExc, NPol):
+    #Simulates an in-phase and quadrature modulator (IQM). The electrical field 'Einput' of the optical signal is
+    #modulated according to the signal "symbols", generating Eoutput. 
+    #the Mach-Zehnder modulators (MZMs) that compose the IQM are considered identical.
+    #symbols: NPol dimensional array of symbols
+    #Einput: NPol dimensional optical carrier symbol 
+    #MZM parameters:
+    #Vpi: MZM Vpi
+    #Bias: Bias Voltage
+    #MaxExc: Upper limit for the excursion of the modulation signal. The modulation signal is scaled so it fits in the the excursion
+    #MinExc: Lower limit for the excursion of the modulation signal
+    #Produces an NPol dimensional IQM output signal
+
+    #In-Phase and Quadrature components of electrical signal:
+    if(NPol==1):
+        mI = np.real(symbols)
+        mI = mI/max(abs(mI))
+        mQ = np.imag(symbols)
+        mQ = mQ/max(abs(mQ))
+
+        #Setting signal excursion
+        mI = mI*(MaxExc-MinExc)/2
+        mQ = mQ*(MaxExc-MinExc)/2
+
+        #Obtaining signals after considering bias:
+        vI = mI + Bias
+        vQ = mQ + Bias
+        
+        #Phase modulation in the I and Q branches:
+        PhiI = np.pi*vI/Vpi
+        PhiQ = np.pi*vQ/Vpi
+
+        #IQM output signal:
+        EOutput = (0.5*np.cos(0.5*PhiI) + 0.5j*np.cos(0.5*PhiQ))*Einput
+
+        return EOutput
+
+    elif(NPol==2):
+        mI0 = np.real(symbols[0])
+        mI0 = mI0/max(abs(mI0))
+        mI1 = np.real(symbols[1])
+        mI1 = mI1/max(abs(mI1))
+
+        mQ0 = np.imag(symbols[0])
+        mQ0 = mQ0/max(abs(mQ0))
+        mQ1 = np.imag(symbols[1])
+        mQ1 = mQ1/max(abs(mQ1))
+
+        #Setting signal excursion
+        mI0 = mI0*(MaxExc-MinExc)/2
+        mQ0 = mQ0*(MaxExc-MinExc)/2
+        mI1 = mI1*(MaxExc-MinExc)/2
+        mQ1 = mQ1*(MaxExc-MinExc)/2
+
+        #Obtaining signals after considering bias:
+        vI0 = mI0 + Bias
+        vQ0 = mQ0 + Bias
+        vI1 = mI1 + Bias
+        vQ1 = mQ1 + Bias
+        
+        #Phase modulation in the I and Q branches:
+        PhiI0 = np.pi*vI0/Vpi
+        PhiQ0 = np.pi*vQ0/Vpi
+        PhiI1 = np.pi*vI1/Vpi
+        PhiQ1 = np.pi*vQ1/Vpi
+
+        #IQM output signal:
+        EOutput0 = (0.5*np.cos(0.5*PhiI0) + 0.5j*np.cos(0.5*PhiQ0))*Einput[0]
+        EOutput1 = (0.5*np.cos(0.5*PhiI1) + 0.5j*np.cos(0.5*PhiQ1))*Einput[1]
+
+        return np.array([EOutput0, EOutput1], dtype=complex)
+
 
 def convmtx(vector, L):
     """
@@ -441,7 +774,7 @@ def convmtx(vector, L):
 
 
 @benchmark(enable_benchmark)
-def BPS(z,Modbits,N,B, toggle_phasenoisecompensation):
+def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
     #Blind Phase Search Phase compensation
     #z is received signal to derotate
     #Modbits defines the QAM format
@@ -458,149 +791,91 @@ def BPS(z,Modbits,N,B, toggle_phasenoisecompensation):
         b = np.arange(-B//2, B//2)
         ThetaTest = p * b / B #B rotation angles
 
-        #This should be 
+        
         ThetaTestMatrix = np.tile(np.exp(-1j*ThetaTest),(L,1)) #L row x B column matrix, each row is phase angle vector
 
-        zB_V = np.concatenate([np.zeros(L // 2, dtype=complex), z, np.zeros(L // 2, dtype=complex)])
-        zB_V = convmtx(zB_V,L)
-        
-        zB_V = np.flipud(zB_V[:, L:-L+1])
+        if(NPol==1):
+            zB_V = np.concatenate([np.zeros(L // 2, dtype=complex), z, np.zeros(L // 2, dtype=complex)])
+            zB_V = convmtx(zB_V,L)
+            zB_V = np.flipud(zB_V[:, L:-L+1])
 
-        zBlocks = zB_V
-        
-        ThetaPU = np.zeros(zBlocks.shape[1]+1)
-        ThetaPrev = 0.0
-        #Phase noise estimates
-        for i in range(zBlocks.shape[1]): #Over columns
-            
-            zrot = np.tile(zBlocks[:, i][:, np.newaxis],(1,B)) * ThetaTestMatrix #ith column repeated 
-            zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1]), dtype=complex)
+            zBlocks = zB_V
 
-            for j in range(zrot.shape[0]): #Decision of rotated symbols
-                zrot_decided[j,:] = max_likelihood_decision(zrot[j,:], Modbits)
+        elif(NPol==2):
+            ThetaTestMatrix = np.stack((ThetaTestMatrix, ThetaTestMatrix) , axis=2)
+            zB_V = np.concatenate([np.zeros(L // 2, dtype=complex), z[0], np.zeros(L // 2, dtype=complex)])
+            zB_V = convmtx(zB_V,L)
+            zB_V = np.flipud(zB_V[:, L:-L+1])
 
-            #intermediate sum to be minimised
-            m = np.sum(abs(zrot-zrot_decided)**2,0)
-            
-            #estimating phase noise as angle that minimises m
-            im = np.argmin(m)
+            zB_H = np.concatenate([np.zeros(L // 2, dtype=complex), z[1], np.zeros(L // 2, dtype=complex)])
+            zB_H = convmtx(zB_H,L)
+            zB_H = np.flipud(zB_H[:, L:-L+1])
 
-            Theta = np.reshape(ThetaTest[im], 1)
-            
-            ThetaPU[i] = Theta + np.floor(0.5-(Theta-ThetaPrev)/p)*p
+            zBlocks = np.stack((zB_V, zB_H), axis=2)
 
-            ThetaPrev = ThetaPU[i]
-        ThetaPU[-1]=ThetaPrev
-        v = z*np.exp(-1j*ThetaPU)
+        if(NPol==1):
+            ThetaPU = np.zeros(zBlocks.shape[1]+1)
+            ThetaPrev = 0.0
 
-        return v, ThetaPU
+        elif(NPol==2):
+            ThetaPU = np.zeros((zBlocks.shape[1]+1, 2))
+            ThetaPrev = np.zeros((1, NPol))
+
+        if(NPol==1):
+            #Phase noise estimates
+            for i in range(zBlocks.shape[1]): #Over columns
+                
+                zrot = np.tile(zBlocks[:, i][:, np.newaxis],(1,B)) * ThetaTestMatrix #ith column repeated 
+                zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1]), dtype=complex)
+
+                for j in range(zrot.shape[0]): #Decision of rotated symbols
+                    zrot_decided[j,:] = max_likelihood_decision(zrot[j,:], Modbits)
+
+                #intermediate sum to be minimised
+                m = np.sum(abs(zrot-zrot_decided)**2,0)
+                
+                #estimating phase noise as angle that minimises m
+                im = np.argmin(m)
+
+                Theta = ThetaTest[im]
+                
+                ThetaPU[i] = Theta + np.floor(0.5-(Theta-ThetaPrev)/p)*p
+
+                ThetaPrev = ThetaPU[i]
+            ThetaPU[-1]=ThetaPrev
+            v = z*np.exp(-1j*ThetaPU)
+            return v, ThetaPU
+
+        elif(NPol==2):
+            #Phase noise estimates
+            for i in range(zBlocks.shape[1]): #Over columns
+                
+                zrot = np.repeat(zBlocks[:,i,:][:, np.newaxis, :], B, axis=1) * ThetaTestMatrix #ith column repeated 
+                zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1], zrot.shape[2]), dtype=complex)
+
+                for j in range(zrot.shape[0]): #Decision of rotated symbols
+                    for pol in range(zrot.shape[2]):
+                        zrot_decided[j,:,pol] = max_likelihood_decision(zrot[j,:,pol], Modbits)
+
+                #intermediate sum to be minimised
+                m = np.sum(abs(zrot-zrot_decided)**2,axis=0)
+                
+                #estimating phase noise as angle that minimises m
+                im = np.argmin(m, axis=0)
+
+                Theta = ThetaTest[im].reshape(1,2)
+                
+                ThetaPU[i, :] = Theta + np.floor(0.5-(Theta-ThetaPrev)/p)*p
+
+                ThetaPrev = ThetaPU[i,:]
+            ThetaPU[-1]=ThetaPrev
+
+            v0 = z[0]*np.exp(-1j*ThetaPU[:,0]) #Matlab deals with 2 x column vectors, so swap to 2 x row vectors
+            v1 = z[1]*np.exp(-1j*ThetaPU[:,1])
+            return np.array([v0,v1]), ThetaPU
         
     else:
         return z, np.zeros(z)
-
-def invert(nparr):
-    #Note input MUST be a numpy array
-    #Same as ~ NOT in Matlab, for array of ones and zeros
-    return 1-nparr
-
-@benchmark(enable_benchmark)  
-def Differential_Encoding_qpsk(bits):
-    #Differential Encoding of QPSK
-    Modbits = 2
-
-    #Bits that define the quadrant:
-    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
-    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
-
-     #Defining the quadrant:
-    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
-
-    #Initial Quadrant:
-    QuadPrev = 1
-
-    #Modulation
-    x = np.zeros(len(Quad), dtype=complex)
-    
-    for i in range(len(x)):
-        x[i] = QuadPrev * Quad[i] * (1+1j)
-        QuadPrev = QuadPrev * Quad[i]
-
-    x = x/np.sqrt(2)
-
-    return x
-
-@benchmark(enable_benchmark)
-def Differential_Encoding_16qam(bits):
-    #Differential Encoding of 16-QAM
-    Modbits = 4
-
-    #Bits that define the quadrant:
-    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
-    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
-
-    #Bits that define the symbols inside the quadrant:
-    InQuadBits1 = np.array(bits[2:len(bits):Modbits], dtype=np.int64)
-    InQuadBits2 = np.array(bits[3:len(bits):Modbits], dtype=np.int64)
-
-    #Defining the quadrant:
-    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
-    
-    #Defining the symbol inside the quadrants:
-    InQuadI = 2*InQuadBits1+ 1
-    InQuadQ = 2*InQuadBits2 + 1
-    InQuadSymbol = InQuadI + 1j*InQuadQ
-
-    #Initial Quadrant
-    QuadPrev = 1
-
-    #Modulation
-    x = np.zeros(len(InQuadBits2), dtype=complex)
-    
-    for i in range(len(x)):
-        x[i] = QuadPrev * Quad[i] * InQuadSymbol[i]
-        QuadPrev = QuadPrev * Quad[i]
-
-    normalised_x = x/np.sqrt(10)
-
-    return normalised_x
-
-@benchmark(enable_benchmark)
-def Differential_Encoding_64qam(bits):
-    #Differential Encoding of 64-QAM
-    Modbits = 6
-
-    #Bits that define the quadrant:
-    Qbits1 = np.array(bits[0:len(bits):Modbits], dtype=np.int64)
-    Qbits2 = np.array(bits[1:len(bits):Modbits], dtype=np.int64)
-
-    #Bits that define the symbols inside the quadrant:
-    InQuadBits1 = np.array(bits[2:len(bits):Modbits], dtype=np.int64)
-    InQuadBits2 = np.array(bits[3:len(bits):Modbits], dtype=np.int64)
-    InQuadBits3 = np.array(bits[4:len(bits):Modbits], dtype=np.int64)
-    InQuadBits4 = np.array(bits[5:len(bits):Modbits], dtype=np.int64)
-
-    #Defining the quadrant:
-    Quad = np.array(invert(Qbits1)&invert(Qbits2), dtype=np.complex128) + (invert(Qbits1)&Qbits2)*np.exp(1j*np.pi/2) + (Qbits1&invert(Qbits2))*np.exp(3j*np.pi/2) + (Qbits1&Qbits2)*np.exp(1j*np.pi)
-    
-    #Defining the symbol inside the quadrants:
-    InQuadI = 7 - (InQuadBits1&invert(InQuadBits2))*2 - (InQuadBits1&InQuadBits2)*4 - (invert(InQuadBits1)&InQuadBits2)*6 
-    InQuadQ = 7 - (InQuadBits3&invert(InQuadBits4))*2 - (InQuadBits3&InQuadBits4)*4 - (invert(InQuadBits3)&InQuadBits4)*6 
-    InQuadSymbol = InQuadI + 1j*InQuadQ
-
-    #Initial Quadrant
-    QuadPrev = 1
-
-    #Modulation
-    x = np.zeros(len(InQuadBits2), dtype=complex)
-    
-    for i in range(len(x)):
-        x[i] = QuadPrev * Quad[i] * InQuadSymbol[i]
-        QuadPrev = QuadPrev * Quad[i]
-
-    normalised_x = x/np.sqrt(42)
-
-    return normalised_x
-
 
 @benchmark(enable_benchmark)
 def Differential_decode_symbols(symbols, Modbits):
@@ -858,40 +1133,63 @@ def Differential_decode_symbols(symbols, Modbits):
         return Decided
     
 @benchmark(enable_benchmark)
-def frequency_recovery(y, Rs, toggle_frequencyrecovery):
+def frequency_recovery(y, Rs, NPol, toggle_frequencyrecovery):
     #y is input signal. y must be obtained with one sample per symbol
     # Rs is symbol rate in symbols/second
     if(toggle_frequencyrecovery==True):
-        f = np.arange(-1/2 + 1/len(y), 1/2, 1/len(y))*Rs
-        Ts = 1/Rs
+        if(NPol==1):
+            f = np.arange(-1/2 + 1/len(y), 1/2, 1/len(y))*Rs
+            Ts = 1/Rs
 
-        signal_power_4 = y** 4
+            signal_power_4 = y** 4
 
-        # Compute the FFT and take the absolute value
-        spectrum = np.fft.fft(signal_power_4)
+            # Compute the FFT and take the absolute value
+            spectrum = np.fft.fft(signal_power_4)
 
-        # Shift the zero frequency component to the center
-        SignalSpectrum = np.fft.fftshift(np.abs(spectrum))
+            # Shift the zero frequency component to the center
+            SignalSpectrum = np.fft.fftshift(np.abs(spectrum))
 
-        max_index = np.argmax(SignalSpectrum)  # Find the index of the maximum value
-        Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
+            max_index = np.argmax(SignalSpectrum)  # Find the index of the maximum value
+            Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
 
-        k = np.arange(len(y))
-        z = y*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
-        
-        print(f'Delta_f from frequency recovery: {Delta_f}Hz')
-        return z
+            k = np.arange(len(y))
+            z = y*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
+            
+            print(f'Delta_f from frequency recovery: {Delta_f}Hz')
+            return z
+        elif(NPol==2):
+            f = np.arange(-1/2 + 1/len(y[0]), 1/2, 1/len(y[0]))*Rs
+            Ts = 1/Rs
+
+            signal_power_4 = y[0]** 4
+
+            # Compute the FFT and take the absolute value
+            spectrum = np.fft.fft(signal_power_4)
+
+            # Shift the zero frequency component to the center
+            SignalSpectrum = np.fft.fftshift(np.abs(spectrum))
+
+            max_index = np.argmax(SignalSpectrum)  # Find the index of the maximum value
+            Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
+
+            k = np.arange(len(y[0]))
+            z0 = y[0]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
+            z1 = y[1]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
+            
+            print(f'Delta_f from frequency recovery: {Delta_f}Hz')
+            return np.array([z0,z1], dtype=complex)
     else:
         return y
     
 @benchmark(enable_benchmark)
-def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, toggle):
-    #symbols: to be transmittes
+def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, NPol, toggle):
+    #symbols: to be transmitted
     #sps: samples per symbol
     #Rs: symbol rate in (symbols/s)
     #D: Dispersion parameter in (ps/(nm x km))
     #CLambda: Central lambda in (m)
     #L: Fibre length in (m)
+    #NPol: Number of polarisations
 
     if(toggle==False):
         return symbols
@@ -903,13 +1201,20 @@ def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, toggle):
         D = D*(1/10**12)/((1/10**9)*1000) #scale to m
 
         #Frequency vector:
-        w = 2 * np.pi * (np.arange(-1/2, 1/2, 1/len(symbols))) * sps * Rs
+        if(NPol==1):
+            w = 2 * np.pi * (np.arange(-1/2, 1/2, 1/len(symbols))) * sps * Rs
+        elif(NPol==2):
+            w = 2 * np.pi * (np.arange(-1/2, 1/2, 1/len(symbols[0]))) * sps * Rs
 
         #Calculating the CD frequency response:
         G = np.exp(1j * ((D*Clambda**2)/(4*np.pi*c))*L*(w**2)) #Quadratic phase shift
 
-        output = ifft(ifftshift(G * fftshift(fft(symbols))))
-
-        return output
+        if(NPol==1):
+            output = ifft(ifftshift(G * fftshift(fft(symbols))))
+            return output
+        elif(NPol==2):
+            output0 = ifft(ifftshift(G * fftshift(fft(symbols[0]))))
+            output1 = ifft(ifftshift(G * fftshift(fft(symbols[1]))))
+            return np.array([output0, output1], dtype=complex)
 
         #fft shift w first then don't have to do double shift - fft wants it to look like this - better way to define
