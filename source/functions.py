@@ -338,7 +338,7 @@ def pulseshaping(symbols, sps, RRCimpulse, NPol, toggle):
         elif(NPol==2):
             #upsample the symbols by inserting (sps-1) zeros between each symbol
             upsampled0 = np.zeros(sps*len(symbols[0]), dtype=complex)
-            upsampled1 = np.zeros(sps*len(symbols[0]), dtype=complex)
+            upsampled1 = np.zeros(sps*len(symbols[1]), dtype=complex)
             for i in range(0, sps*len(symbols[0]), sps):
                 upsampled0[i] = symbols[0][i//sps]
                 upsampled1[i] = symbols[1][i//sps]
@@ -356,22 +356,22 @@ def pulseshaping(symbols, sps, RRCimpulse, NPol, toggle):
 @benchmark(enable_benchmark)
 def add_noise(signal, snrb_db, sps, Modbits, NPol, toggle_AWGNnoise): 
     #addition of circular Gaussian noise to transmitted signal
-    #snrb_db snr per bit in dB in transmitted signal
+    #snrb_db snr per symbol in dB in transmitted signal
     #Modbits per symbol eg 16QAM or 64QAM etc.
     #sps samples per symbol
     if(toggle_AWGNnoise==True):
         if(NPol==1):
             snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
-            stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*Modbits*snr))
+            stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*snr))
             noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
 
             return signal + noise 
         elif(NPol==2):
             snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
-            stdev0= np.sqrt(np.mean(abs(signal[0])**2)*sps/(2*Modbits*snr))
-            stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*Modbits*snr))
+            stdev0= np.sqrt(np.mean(abs(signal[0])**2)*sps/(2*snr))
+            stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*snr))
             noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))
             noise1 = stdev1 * (np.random.randn(len(signal[1])) + 1j * np.random.randn(len(signal[1])))
 
@@ -398,7 +398,7 @@ def matched_filter(signal, pulse_shape, NPol, toggle):
             return np.array([filtered0, filtered1], dtype=complex)
 
     else:
-        return signal
+        return signal/(np.sqrt(np.mean(abs(signal)**2)))
 
 @benchmark(enable_benchmark)
 def plot_constellation(ax, symbols, title, lim=2):
@@ -875,7 +875,10 @@ def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
             return np.array([v0,v1]), ThetaPU
         
     else:
-        return z, np.zeros(z)
+        if(NPol==1):
+            return z, np.zeros(len(z))
+        elif(NPol==2):
+            return z, np.zeros((len(z[0]),NPol))
 
 @benchmark(enable_benchmark)
 def Differential_decode_symbols(symbols, Modbits):
@@ -1218,3 +1221,105 @@ def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, NPol, toggle):
             return np.array([output0, output1], dtype=complex)
 
         #fft shift w first then don't have to do double shift - fft wants it to look like this - better way to define
+
+@benchmark(enable_benchmark)
+def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle_CD):
+    #input: input signal
+    #D: Dispersion parameter (ps\(ns*km))
+    #L: Fiber length (m)
+    #CLambda: Central wavelength (m)
+    #Rs: Symbol rate 
+    #NPol: Number of polarisations used
+    #sps: number of samples per symbol in input signal "in"
+    #NFFT: FFT size
+    #NOverlap: Over lap sized. if odd, forced to nearest even number > Noveralp
+    if(toggle_CD==False):
+        return input
+    
+    c = 299792458
+    D = D1/10**6
+
+    #index for coeffificent calculation and Nyquist frequency
+    n = np.arange(-NFFT//2, NFFT//2, 1)
+    
+    fN = sps*Rs/2
+
+    if(NPol==1):
+        #Calculating CD frequency response
+        HCD = np.exp((-1j*np.pi*(CLambda**2)*D*L/c)*(n*2*fN/NFFT)**2)
+        
+        #NOverlap made even:
+        NOverlap = NOverlap + NOverlap%2
+
+        #Extending input signal so blocks are properly formed
+        AuxLen = len(input)/(NFFT-NOverlap)
+
+        if(AuxLen != np.ceil(AuxLen)):
+            NExtra = np.ceil(AuxLen)*(NFFT-NOverlap) - len(input)
+            input = np.concatenate([input[int(-NExtra//2):], input, input[:int(NExtra//2)]], dtype=complex)
+            
+        else:
+            NExtra = NOverlap
+            input = np.concatenate([input[-NExtra//2:], input, input[:NExtra//2]],dtype=complex)
+
+        #Blocks
+        Blocks = input.reshape( NFFT-NOverlap, len(input)//(NFFT-NOverlap),order='F')
+
+        output = np.zeros(Blocks.shape, dtype=complex)
+        overlap = np.zeros(NOverlap, dtype=complex)
+
+        #Compensating for chromatic dispersion
+        for i in range(len(Blocks[1])):
+            #input block with overlap:
+            InB = np.concatenate([overlap,Blocks[:,i]], dtype=complex)
+            #FFT of input block
+            InBFreq = fftshift(fft(InB))
+            #Filtering in freq. domain
+            OutFDEFreq = InBFreq * HCD
+            #IFFT of block after filtering
+            OutFDE = ifft(ifftshift(OutFDEFreq))
+            #Overlap
+            overlap = InB[-NOverlap:]
+            #Output block
+            OutB  = OutFDE[NOverlap//2:-NOverlap//2]
+            #Assigning samples to output signal:
+            output[:,i] = OutB
+        print(input.shape)
+        
+        print(output.shape)
+
+        outputT = output.T
+        output = outputT.reshape(-1)
+        print(output.shape)
+        #Quantity of samples to discard
+        DInit = int((NExtra+NOverlap)//2)
+        DFin = int((NExtra-NOverlap)//2)
+        
+        output = output[DInit:-DFin] 
+        print('s',output.shape)
+
+        return output
+
+    elif(NPol==2):
+        #Calculating CD frequency response
+        HCD = np.exp((-1j*np.pi*(CLambda**2)*D*L/c)*(n*2*fN/NFFT)**2)
+        HCD = np.stack((HCD,HCD), axis=2)
+        
+        #NOverlap made even:
+        NOverlap = NOverlap = NOverlap%2
+
+        #Extending input signal so blocks are properly formed
+        AuxLen = len(input[0])/(NFFT-NOverlap)
+
+        if(AuxLen != np.ceil(AuxLen)):
+            NExtra = np.ceil(AuxLen)*(NFFT-NOverlap) - len(input[0])
+            input = np.array([input[:,-NExtra/2:], input, input[:,:NExtra/2]])
+        else:
+            NExtra = NOverlap
+            input = np.array([input[:,-NExtra/2:], input, input[:,:NExtra/2]])
+
+        #Blocks
+        BlocksV = input[0].reshape(NFFT-NOverlap, len(input[0])/(NFFT-NOverlap))
+        BlocksH = input[1].reshape(NFFT-NOverlap, len(input[1])/(NFFT-NOverlap))
+        Blocks = np.stack((BlocksV, BlocksH), axis=2)
+
