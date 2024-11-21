@@ -22,9 +22,9 @@ from matplotlib.ticker import MaxNLocator
 def main():
     num_symbols = 10000 #Number of symbols in each polarisation
     
-    Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    NPol = 1 #Number of polarisations used
+    NPol = 2 #Number of polarisations used
 
     #Phase noise parameters
     maxDvT = 1/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
@@ -68,7 +68,7 @@ def main():
     Clambda = 1550 / (10**9) #Central lambda in (m)
     L = 1000*(10**3)#Fibre length in (m)
     NFFT = 128 #Adjusted to minimise complexity
-    NOverlap = 10 #Given by minimum equaliser length N_CD : pg 113 CDOT graph
+    NOverlap = 10 #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
 
     snr_begin = 0
 
@@ -209,6 +209,10 @@ def main():
                     AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
         elif(NPol==2):
             BER[i] = (np.sum(original_bits[0] != demod_bits[0])+np.sum(original_bits[1] != demod_bits[1]))/(NPol*num_symbols*Modbits)
+            if(AIR_type=='GMI'):
+                AIR[i] = (p.AIR_SDBW(symbols[0], original_bits[0], Phase_Noise_compensated_rx[0], Modbits) + p.AIR_SDBW(symbols[1], original_bits[1], Phase_Noise_compensated_rx[1], Modbits))/2
+            elif(AIR_type=='MI'):
+                AIR[i] = 0.5*(p.AIR_SDSW(symbols[0], Phase_Noise_compensated_rx[0], Modbits)+p.AIR_SDSW(symbols[1], Phase_Noise_compensated_rx[1], Modbits))
 
         # Plot downsampled received constellation, including different colour for erroneous results
         #Only plot some of the results:
@@ -234,7 +238,6 @@ def main():
             if(NPol==1):
                 axs4[i//3].plot(np.arange(num_symbols), thetaHat, color='red', label='Phase Estimate')
             elif(NPol==2):
-                print(thetaHat.shape)
                 axs4[i//3].plot(np.arange(num_symbols), thetaHat[:,0], color='red', label='Phase Estimate (V)')
                 axs4[i//3].plot(np.arange(num_symbols), thetaHat[:,1], color='orange', label='Phase Estimate (H)')
             
