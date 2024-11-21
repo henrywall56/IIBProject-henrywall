@@ -1263,7 +1263,7 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
             input = np.concatenate([input[-NExtra//2:], input, input[:NExtra//2]],dtype=complex)
 
         #Blocks
-        Blocks = input.reshape( NFFT-NOverlap, len(input)//(NFFT-NOverlap),order='F')
+        Blocks = input.reshape( NFFT-NOverlap, len(input)//(NFFT-NOverlap),order='F') #order to get same reshape as matlab
 
         output = np.zeros(Blocks.shape, dtype=complex)
         overlap = np.zeros(NOverlap, dtype=complex)
@@ -1284,42 +1284,21 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
             OutB  = OutFDE[NOverlap//2:-NOverlap//2]
             #Assigning samples to output signal:
             output[:,i] = OutB
-        print(input.shape)
-        
-        print(output.shape)
-
+ 
         outputT = output.T
         output = outputT.reshape(-1)
-        print(output.shape)
+ 
         #Quantity of samples to discard
         DInit = int((NExtra+NOverlap)//2)
         DFin = int((NExtra-NOverlap)//2)
         
         output = output[DInit:-DFin] 
-        print('s',output.shape)
 
         return output
 
     elif(NPol==2):
-        #Calculating CD frequency response
-        HCD = np.exp((-1j*np.pi*(CLambda**2)*D*L/c)*(n*2*fN/NFFT)**2)
-        HCD = np.stack((HCD,HCD), axis=2)
-        
-        #NOverlap made even:
-        NOverlap = NOverlap = NOverlap%2
+        output0 = CD_compensation(input[0], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
+        output1 = CD_compensation(input[1], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
 
-        #Extending input signal so blocks are properly formed
-        AuxLen = len(input[0])/(NFFT-NOverlap)
-
-        if(AuxLen != np.ceil(AuxLen)):
-            NExtra = np.ceil(AuxLen)*(NFFT-NOverlap) - len(input[0])
-            input = np.array([input[:,-NExtra/2:], input, input[:,:NExtra/2]])
-        else:
-            NExtra = NOverlap
-            input = np.array([input[:,-NExtra/2:], input, input[:,:NExtra/2]])
-
-        #Blocks
-        BlocksV = input[0].reshape(NFFT-NOverlap, len(input[0])/(NFFT-NOverlap))
-        BlocksH = input[1].reshape(NFFT-NOverlap, len(input[1])/(NFFT-NOverlap))
-        Blocks = np.stack((BlocksV, BlocksH), axis=2)
+        return np.array([output0,output1])
 
