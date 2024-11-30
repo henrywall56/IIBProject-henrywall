@@ -4,6 +4,7 @@ from scipy.signal import convolve #upfirdn for up/down sampling
 import time
 from scipy.fft import fft, ifft, fftshift, ifftshift
 
+
 #References: Digital Coherent Optical Systems Textbook, Matlab Code, page 38
 
 enable_benchmark = True  #True turns on benchmarking
@@ -323,6 +324,7 @@ def pulseshaping(symbols, sps, RRCimpulse, NPol, toggle):
     #filter parameters are span and rolloff
     #sequence of symbols upsampled to sps samples per symbol then applied RRC filter
     #Applies pulse shaping two NPol polarisations
+    
     if(toggle==True):
         if(NPol==1):
         
@@ -451,6 +453,7 @@ def RRC(span, rolloff, sps):
     g = g / np.max(g)
 
     t = np.arange(-span * sps / 2, span * sps / 2 + 1)
+
     return g , t
 
 @benchmark(False)
@@ -1197,7 +1200,7 @@ def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, NPol, toggle):
     if(toggle==False):
         return symbols
     else:
-
+        
         c = 299792458 #speed of light
 
         #Dispersion
@@ -1235,70 +1238,69 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
     #NOverlap: Over lap sized. if odd, forced to nearest even number > Noveralp
     if(toggle_CD==False):
         return input
-    
-    c = 299792458
-    D = D1/10**6
+    else:
+        c = 299792458
+        D = D1/10**6
 
-    #index for coeffificent calculation and Nyquist frequency
-    n = np.arange(-NFFT//2, NFFT//2, 1)
-    
-    fN = sps*Rs/2
-
-    if(NPol==1):
-        #Calculating CD frequency response
-        HCD = np.exp((-1j*np.pi*(CLambda**2)*D*L/c)*(n*2*fN/NFFT)**2)
+        #index for coeffificent calculation and Nyquist frequency
+        n = np.arange(-NFFT//2, NFFT//2, 1)
         
-        #NOverlap made even:
-        NOverlap = NOverlap + NOverlap%2
+        fN = sps*Rs/2
 
-        #Extending input signal so blocks are properly formed
-        AuxLen = len(input)/(NFFT-NOverlap)
-
-        if(AuxLen != np.ceil(AuxLen)):
-            NExtra = np.ceil(AuxLen)*(NFFT-NOverlap) - len(input)
-            input = np.concatenate([input[int(-NExtra//2):], input, input[:int(NExtra//2)]], dtype=complex)
+        if(NPol==1):
+            #Calculating CD frequency response
+            HCD = np.exp((-1j*np.pi*(CLambda**2)*D*L/c)*(n*2*fN/NFFT)**2)
             
-        else:
-            NExtra = NOverlap
-            input = np.concatenate([input[-NExtra//2:], input, input[:NExtra//2]],dtype=complex)
+            #NOverlap made even:
+            NOverlap = NOverlap + NOverlap%2
 
-        #Blocks
-        Blocks = input.reshape( NFFT-NOverlap, len(input)//(NFFT-NOverlap),order='F') #order to get same reshape as matlab
+            #Extending input signal so blocks are properly formed
+            AuxLen = len(input)/(NFFT-NOverlap)
 
-        output = np.zeros(Blocks.shape, dtype=complex)
-        overlap = np.zeros(NOverlap, dtype=complex)
+            if(AuxLen != np.ceil(AuxLen)):
+                NExtra = np.ceil(AuxLen)*(NFFT-NOverlap) - len(input)
+                input = np.concatenate([input[int(-NExtra//2):], input, input[:int(NExtra//2)]], dtype=complex)
+                
+            else:
+                NExtra = NOverlap
+                input = np.concatenate([input[-NExtra//2:], input, input[:NExtra//2]],dtype=complex)
 
-        #Compensating for chromatic dispersion
-        for i in range(len(Blocks[1])):
-            #input block with overlap:
-            InB = np.concatenate([overlap,Blocks[:,i]], dtype=complex)
-            #FFT of input block
-            InBFreq = fftshift(fft(InB))
-            #Filtering in freq. domain
-            OutFDEFreq = InBFreq * HCD
-            #IFFT of block after filtering
-            OutFDE = ifft(ifftshift(OutFDEFreq))
-            #Overlap
-            overlap = InB[-NOverlap:]
-            #Output block
-            OutB  = OutFDE[NOverlap//2:-NOverlap//2]
-            #Assigning samples to output signal:
-            output[:,i] = OutB
- 
-        outputT = output.T
-        output = outputT.reshape(-1)
- 
-        #Quantity of samples to discard
-        DInit = int((NExtra+NOverlap)//2)
-        DFin = int((NExtra-NOverlap)//2)
-        
-        output = output[DInit:-DFin] 
+            #Blocks
+            Blocks = input.reshape( NFFT-NOverlap, len(input)//(NFFT-NOverlap),order='F') #order to get same reshape as matlab
 
-        return output
+            output = np.zeros(Blocks.shape, dtype=complex)
+            overlap = np.zeros(NOverlap, dtype=complex)
 
-    elif(NPol==2):
-        output0 = CD_compensation(input[0], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
-        output1 = CD_compensation(input[1], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
+            #Compensating for chromatic dispersion
+            for i in range(len(Blocks[1])):
+                #input block with overlap:
+                InB = np.concatenate([overlap,Blocks[:,i]], dtype=complex)
+                #FFT of input block
+                InBFreq = fftshift(fft(InB))
+                #Filtering in freq. domain
+                OutFDEFreq = InBFreq * HCD
+                #IFFT of block after filtering
+                OutFDE = ifft(ifftshift(OutFDEFreq))
+                #Overlap
+                overlap = InB[-NOverlap:]
+                #Output block
+                OutB  = OutFDE[NOverlap//2:-NOverlap//2]
+                #Assigning samples to output signal:
+                output[:,i] = OutB
+    
+            outputT = output.T
+            output = outputT.reshape(-1)
+    
+            #Quantity of samples to discard
+            DInit = int((NExtra+NOverlap)//2)
+            DFin = int((NExtra-NOverlap)//2)
+            
+            output = output[DInit:-DFin] 
 
-        return np.array([output0,output1])
+            return output
 
+        elif(NPol==2):
+            output0 = CD_compensation(input[0], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
+            output1 = CD_compensation(input[1], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
+
+            return np.array([output0,output1])

@@ -20,9 +20,9 @@ from matplotlib.ticker import MaxNLocator
 
 """
 def main():
-    num_symbols = 10000 #Number of symbols in each polarisation
+    num_symbols = 2000 #Number of symbols in each polarisation
     
-    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
 
@@ -74,8 +74,8 @@ def main():
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
-    toggle_phasenoise = False #toggle phase noise
-    toggle_phasenoisecompensation = False #toggle phase noise compensation
+    toggle_phasenoise = True #toggle phase noise
+    toggle_phasenoisecompensation = True #toggle phase noise compensation
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = True #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
