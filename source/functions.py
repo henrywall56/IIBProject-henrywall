@@ -1304,3 +1304,78 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
             output1 = CD_compensation(input[1], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
 
             return np.array([output0,output1])
+
+@benchmark(enable_benchmark)
+def SSFM(input, Rs, D, Clambda, L, N, NPol):
+    #Split Step Fourier Method to apply Chromatic Dispersion and Non-Linear effects
+    #input: input signal
+    #fiblen: fiber length in units of the dispersion length
+    #N: Soliton order of Non-linear Schrodinger 
+    #beta2: sign of group velocity dospersion parameter
+
+    T_0 = 1/(Rs) #initial width of input pulses ?? is this right
+    D_SI = (1/10**12)/((1/10**9)*1000)*D #in standard units
+
+    beta2 = (Clambda**2)*D_SI/(2*np.pi*299792458) #beta_2 is dispersion parameter with respect to frequency instead of wavelength
+    L_D = T_0**2/abs(beta2) #dispersion length
+    
+    fiblen = L/L_D #Fibre length in units of dispersion length L_D
+    beta2sign = 1
+
+    nt=1024 #FFT points (power of 2)
+    Tmax=32 #window size chosen to be 20-25 times width of input pulses
+    
+    step_num = int(np.floor(20*fiblen*(N**2))) #Number of steps along fiber (z)
+    
+    deltaz = fiblen/step_num
+
+    dtau = 2*Tmax/nt #step size in tau
+
+    if(NPol==1):
+        tau = np.arange(-nt / 2, nt / 2, nt/len(input))*dtau #time array
+        omega = fftshift(np.arange(-nt / 2, nt / 2,  nt/len(input)))*(np.pi/Tmax) #omega array
+
+        dispersion = np.exp(0.5j*beta2sign*(omega**2)*deltaz) #phase factor
+
+        hhz = 1j*(N**2)*deltaz #non-linear phase factor
+
+        temp = input*np.exp((abs(input)**2)*hhz/2)
+
+        for i in range(step_num):
+            f_temp = ifft(temp)*dispersion
+            input = fft(f_temp)
+            temp = input * np.exp(hhz*abs(input)**2)
+
+        input = temp * np.exp(-1*(abs(input)**2)*hhz/2)
+        
+        return input
+    
+    elif(NPol==2):
+        tau= np.arange(-nt / 2, nt / 2, nt/len(input[0]))*dtau #time array
+        omega = fftshift(np.arange(-nt / 2, nt / 2,  nt/len(input[0])))*(np.pi/Tmax) #omega array
+
+        dispersion = np.exp(0.5j*beta2sign*(omega**2)*deltaz) #phase factor
+
+        hhz = 1j*(N**2)*deltaz #non-linear phase factor
+
+        temp0 = input[0]*np.exp(((abs(input[0])**2)+(abs(input[1])**2))*hhz/2)  #Total power affects each polarisation
+        temp1 = input[1]*np.exp(((abs(input[0])**2)+(abs(input[1])**2))*hhz/2)
+        
+        for i in range(step_num):
+            
+            f_temp0 = ifft(temp0)*dispersion
+            
+            input[0] = fft(f_temp0)
+            f_temp1 = ifft(temp1)*dispersion
+            input[1] = fft(f_temp1)
+
+            temp0 = input[0] * np.exp(hhz*((abs(input[0])**2)+(abs(input[1])**2)))  
+            temp1 = input[1] * np.exp(hhz*((abs(input[0])**2)+(abs(input[1])**2)))
+
+
+        input[0] = temp0 * np.exp(-1*((abs(input[0])**2)+(abs(input[1])**2))*hhz/2)
+        input[1] = temp1 * np.exp(-1*((abs(input[0])**2)+(abs(input[1])**2))*hhz/2)
+        
+        return input
+      
+    
