@@ -378,7 +378,7 @@ def AIR_SDSW(x,y,Modbits):
 
     #Estimating AIR (MI)
     AIR = np.sum(np.log2(qY_X/(qY_S/M)))/len(y)
-
+    
     return AIR
 
     

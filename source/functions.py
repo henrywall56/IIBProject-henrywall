@@ -899,7 +899,7 @@ def Differential_decode_symbols(symbols, Modbits):
 
         #Defining the quadrant:
         Q = np.zeros(len(symbols), dtype=int)
-        # Assign values based on conditions
+        # Fssign values based on conditions
         Q[R1 & R3] = 0  # Set Q to 0 where R1 and R3 are True
         Q[R2 & R3] = 1  # Set Q to 1 where R2 and R3 are True
         Q[R2 & R4] = 2  # Set Q to 2 where R2 and R4 are True
@@ -1378,4 +1378,156 @@ def SSFM(input, Rs, D, Clambda, L, N, NPol):
         
         return input
       
+@benchmark(enable_benchmark)
+def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2, NOut):
+        #input: 2 polarisation input signal. normalised to unit power and obtained at 2 Sa/Symbol.
+        #sps: samples per symbol in input signal
+        #flag: type of equalisation method used ('CMA', 'RDE', 'CMA+RDE').
+        #NTaps: number of taps for the filters in the butterfly configuration.
+        #Mu: step-size for coefficients calculation.
+        #singlespike: 'True' = single spike initialisation. 'False' = All taps initialised with zeros.
+        #N1: number of coefficent calculations to perform prior to proper initialisation of w2H, w2V.
+        #N2: number of coefficient calculations to peform prior to switch from CMA to RDE (only defined if CMA used for intialisation).
+        #NOut: number of samples to discard after equalisation.
+        
+        #Radii for constellations with unitary power:
+        input = input/(np.sqrt(np.mean(abs(input)**2)))
+        
+        #Equalisation algorithms:
+        CMAFlag = False
+        RDEFlag = False
+        CMAtoRDE = False
+        CMAInit = False
+
+        if(flag == 'CMA'):
+            CMAFlag = True
+        elif(flag == 'CMA+RDE'):
+            CMAFlag = True
+            CMAtoRDE = True
+            CMAInit = True
+        elif(flag == 'RDE'):
+            RDEFlag = True
+
+        if(CMAFlag==True):
+            if(CMAtoRDE==False):
+                R_CMA = 1
+            else:
+                R_CMA = 1.32
+        
+        if(CMAtoRDE==True or RDEFlag==True):
+            R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)])
+
+        #Input Blocks:
+        x = np.concatenate([input[:,-1*int(np.floor(NTaps/2)):], input, input[:,:int(np.floor(NTaps/2))]], axis=1)
+        
+        xV = convmtx(x[0], NTaps)
+        xH = convmtx(x[1], NTaps)
+        
+        xV = xV[:, NTaps:xV.shape[1]-NTaps+1:sps]
+        xH = xH[:, NTaps:xH.shape[1]-NTaps+1:sps]
+        
+
+        #Output Length:
+        OutLength = int(np.floor((x.shape[1]-NTaps+1)/2))
+
+        #Initialising the outputs:
+        y1 = np.zeros(OutLength, dtype=complex)
+        y2 = np.zeros(OutLength, dtype=complex)
+
+        #Initialising filter coefficients:
+        w1V = np.zeros(NTaps, dtype=complex)
+        w1H = np.zeros(NTaps, dtype=complex)
+        w2V = np.zeros(NTaps, dtype=complex)
+        w2H = np.zeros(NTaps, dtype=complex)
+
+        #If single spike initialisation:
+        if(singlespike==True):
+            w1V[int(np.floor(NTaps/2))] = 1
+            
+        for i in range(OutLength):
+            #Calculating the outputs:
+            y1[i] = np.dot(np.conjugate(w1V), xV[:,i]) + np.dot(np.conjugate(w1H), xH[:,i])
+            y2[i] = np.dot(np.conjugate(w2V), xV[:,i]) + np.dot(np.conjugate(w2H), xH[:,i])
+
+            #Updating the filter coefficients:
+            if(CMAFlag==True):
+                #Constant modulus algorithm:
+                w1V, w1H, w2V, w2H = CMA(xV[:,i], xH[:,i], y1[i], y2[i], w1V, w1H, w2V, w2H, R_CMA, Mu)
+            
+                if(CMAtoRDE==True):
+                    if(i==N2):
+                        CMAFlag=False
+                        RDEFlag=True
+
+            elif(RDEFlag==True):
+                #Radius-directed equalisation
+                w1V, w1H, w2V, w2H = RDE(xV[:,i], xH[:,i], y1[i], y2[i], w1V, w1H, w2V, w2H, R_RDE, Mu)
+
+            #reinitialisation of the filter coefficients:
+            if(i==N1 and singlespike==True):
+                w2H = np.conjugate(w1V[::-1]) #reverse and conjugate
+                w2V = -1*np.conjugate(w1H[::-1])
+        
+        #Output Samples:
+        y = np.array([y1,y2])
+        y = y[:, NOut:]
+        
+        return y
+
+def CMA(xV, xH, y1, y2, w1V, w1H, w2V, w2H, R, Mu):
+    #xV: column vector that represents the complex samples at the MIMO butterfly equaliser input for the vertical polarisation.
+    #xH: column vector that represents the complex samples at the MIMO butterfly equaliser input for the horizontal polarisation.
+    #y1: sample at the output 1 of the MIMO butterfly equaliser.
+    #y2: sample at the output 2 of the MIMO butterfly equaliser.
+    #w1V,w1H,w2V,w2H: N-coefficient FIR filters that compose the MIMO butterfly equaliser.
+    #R: radius used as referenec for coefficients calculation.
+    #Mu: step-size for coefficients calculation.
+    #xV & xH must has same length as w's.
+
+    #Outputs updated filter coefficients
     
+
+    w1V = w1V + Mu*xV*(R-np.abs(y1)**2)*np.conjugate(y1)
+    w1H = w1H + Mu*xH*(R-np.abs(y1)**2)*np.conjugate(y1)
+    w2V = w2V + Mu*xV*(R-np.abs(y2)**2)*np.conjugate(y2)
+    w2H = w2H + Mu*xH*(R-np.abs(y2)**2)*np.conjugate(y2)
+
+    return w1V, w1H, w2V, w2H
+
+def RDE(xV, xH, y1, y2, w1V, w1H, w2V, w2H, R, Mu):
+    #xV: column vector that represents the complex samples at the MIMO butterfly equaliser input for the vertical polarisation.
+    #xH: column vector that represents the complex samples at the MIMO butterfly equaliser input for the horizontal polarisation.
+    #y1: sample at the output 1 of the MIMO butterfly equaliser.
+    #y2: sample at the output 2 of the MIMO butterfly equaliser.
+    #w1V,w1H,w2V,w2H: N-coefficient FIR filters that compose the MIMO butterfly equaliser.
+    #R: radius used as referenec for coefficients calculation (array)
+    #Mu: step-size for coefficients calculation
+    #xV & xH must has same length as w's
+
+    #Outputs updated filter coefficients
+    
+    r1 = np.argmin(np.abs(R-np.abs(y1))) #reshape y1 from (length,) to (length,1) for broadcasting with R
+    r2 = np.argmin(np.abs(R-np.abs(y2)))
+
+    w1V = w1V + Mu*xV*(R[r1]**2-np.abs(y1)**2)*np.conjugate(y1)
+    w1H = w1H + Mu*xH*(R[r1]**2-np.abs(y1)**2)*np.conjugate(y1)
+    w2V = w2V + Mu*xV*(R[r2]**2-np.abs(y2)**2)*np.conjugate(y2)
+    w2H = w2H + Mu*xH*(R[r2]**2-np.abs(y2)**2)*np.conjugate(y2)
+
+    return w1V, w1H, w2V, w2H
+
+
+def mix_polarization_signals(signal, angle_deg):
+    # Convert the angle to radians
+    angle_rad = np.deg2rad(angle_deg)
+    
+    # Define the rotation matrix
+    rotation_matrix = np.array([
+        [np.cos(angle_rad), -np.sin(angle_rad)],
+        [np.sin(angle_rad), np.cos(angle_rad)]
+    ])
+    
+    # Apply the rotation matrix element-wise across the samples
+    rotated_signals = np.dot(rotation_matrix, signal)
+    
+    return rotated_signals

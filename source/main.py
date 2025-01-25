@@ -23,16 +23,16 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 
 """
 def main():
-    num_power = 13
+    num_power = 14
     num_symbols = 2**num_power #Number of symbols in each polarisation
     
-    Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
 
     #Phase noise parameters
-    maxDvT = 1/(10**6) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
-    Linewidth = 10**5 #Linewidth of laser in Hz
+    maxDvT = 1/(10**4) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
+    Linewidth = 10*10**6 #Linewidth of laser in Hz
     laser_power = 0 #Total laser power in dBm
     
     #Generate RRC filter impulse response
@@ -70,11 +70,11 @@ def main():
     #Chromatic Dispersion Parameters
     D = 17#Dispersion parameter in (ps/(nm x km))
     Clambda = 1550 / (10**9) #Central lambda in (m)
-    L = 5000*(10**3)#Fibre length in (m)
+    L = 1000*(10**3)#Fibre length in (m)
     NFFT = 128 #Adjusted to minimise complexity
     NOverlap = 10 #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
 
-    snr_begin = 10
+    snr_begin = 15
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -83,22 +83,25 @@ def main():
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = False #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
-    toggle_DE = True #toggle Differential Encoding
+    toggle_DE = False #toggle Differential Encoding
     toggle_frequencyrecovery = False #toggle Frequency Recovery
-    toggle_CD = True #Toggle Chromatic Dispersion
-    toggle_NL = True
-    toggle_CD_compensation = True #Toggle Chromatic Dispersion Compensation
+    toggle_CD = False #Toggle Chromatic Dispersion
+    toggle_NL = False
+    toggle_CD_compensation = False #Toggle Chromatic Dispersion Compensation
     toggle_AIR = True
+    toggle_adaptive_equalisation = True
     AIR_type = 'MI' #'MI' or 'GMI'
     
-
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
 
     #There is a max Linewidth * T = maxDvT
     #T = 1/(Rs*sps)
-    Rs = Linewidth/(sps*maxDvT) #Rs symbol rate symbols/second
-    
+    #Rs = Linewidth/(sps*maxDvT) #Rs symbol rate symbols/second (Baud)
+    Rs = 50e9
+
+    print('Symbol Rate: ', Rs/1e9, 'GBaud')
+    print('Bit Rate: ', Modbits*Rs/1e9, 'GBit/s')
     
     original_bits = f.generate_original_bits(num_symbols, Modbits, NPol) #NPol-dimensional array
 
@@ -128,6 +131,10 @@ def main():
     fig4, axs4 = plt.subplots(2, 2, figsize=(8, 8))  #Phase noise plot
     axs4= axs4.flatten()  # Flatten the array for easy indexing
 
+    if(toggle_adaptive_equalisation and NPol==2):
+            fig5, axs5 = plt.subplots(2, 2, figsize=(8, 8))  #Adaptive equalisation magnitude plots
+            axs5= axs5.flatten()  # Flatten the array for easy indexing
+
     BER = np.empty(len(snr_db))
     SER = np.empty(len(snr_db))
     AIR = np.empty(len(snr_db))
@@ -153,6 +160,8 @@ def main():
 
         rx = CD_NL_signal #Skipping receiver front end for now
 
+        #rx = f.mix_polarisation_signals(CD_NL_signal, 45)
+
         filtered_signal = f.matched_filter(rx, RRCimpulse, NPol, toggle=toggle_RRC) #if toggle is False, this function returns input
         
         ADC = f.downsample(filtered_signal, sps//2, NPol, toggle=toggle_RRC) #Simulate ADC downsampling to 2 sps
@@ -162,12 +171,19 @@ def main():
             spsCD = 2
         else:
             spsCD=1
+
         CD_compensated_rx = f.CD_compensation(ADC, D, L, Clambda, Rs, NPol, spsCD, NFFT, NOverlap, toggle_CD_compensation)
 
-        #Adaptive Equalisation Here
+        if(toggle_adaptive_equalisation == True and NPol == 2):
+            N1=10000
+            N2=0
+            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, 'CMA+RDE', 11, 1e-2, True, N1, N2, 0)
+            downsampled_rx = adaptive_eq_rx #downsampling done within adaptive equalisation
+            
+        else:
+            adaptive_eq_rx = CD_compensated_rx
+            downsampled_rx = f.downsample(adaptive_eq_rx, 2, NPol, toggle=toggle_RRC) #Downsampled from 2 sps to 1 sps
 
-        downsampled_rx = f.downsample(CD_compensated_rx, 2, NPol, toggle=toggle_RRC) #Downsampled from 2 sps to 1 sps
-    
         frequency_recovered = f.frequency_recovery(downsampled_rx, Rs, NPol, toggle_frequencyrecovery)
         
         if(toggle_BPS==True):
@@ -265,8 +281,8 @@ def main():
                 if(NPol==2):
                     axs1V[i//3].scatter(Phase_Noise_compensated_rx[0][erroneous_indexesV].real, Phase_Noise_compensated_rx[0][erroneous_indexesV].imag, color='red', label='Errors', alpha=0.5)
                     axs1H[i//3].scatter(Phase_Noise_compensated_rx[1][erroneous_indexesH].real, Phase_Noise_compensated_rx[1][erroneous_indexesH].imag, color='red', label='Errors', alpha=0.5)
-                    axs4[i//3].vlines(erroneous_indexesV, ymin=-0.05, ymax=0.05, colors='g', alpha=0.2, label='Erroneous Indexes (V)')
-                    axs4[i//3].vlines(erroneous_indexesH, ymin=-0.05, ymax=0.05, colors='purple', alpha=0.2, label='Erroneous Indexes (H)')
+                    #axs4[i//3].vlines(erroneous_indexesV, ymin=-0.05, ymax=0.05, colors='g', alpha=0.2, label='Erroneous Indexes (V)')
+                    #axs4[i//3].vlines(erroneous_indexesH, ymin=-0.05, ymax=0.05, colors='purple', alpha=0.2, label='Erroneous Indexes (H)')
             else:
                 
                 if(NPol==1):
@@ -275,10 +291,20 @@ def main():
                 if(NPol==2):
                     axs1V[i//3].scatter(Phase_Noise_compensated_rx[0][erroneous_bit_indexesV//Modbits].real, Phase_Noise_compensated_rx[0][erroneous_bit_indexesV//Modbits].imag, color='red', label='Errors', alpha=0.5)
                     axs1H[i//3].scatter(Phase_Noise_compensated_rx[1][erroneous_bit_indexesH//Modbits].real, Phase_Noise_compensated_rx[1][erroneous_bit_indexesH//Modbits].imag, color='red', label='Errors', alpha=0.5)
-                    axs4[i//3].vlines(erroneous_bit_indexesV//Modbits, ymin=-0.05, ymax=0.05, colors='g', alpha=0.2, label='Erroneous Indexes (V)')
-                    axs4[i//3].vlines(erroneous_bit_indexesH//Modbits, ymin=-0.05, ymax=0.05, colors='purple', alpha=0.2, label='Erroneous Indexes (H)')
+                    #axs4[i//3].vlines(erroneous_bit_indexesV//Modbits, ymin=-0.05, ymax=0.05, colors='g', alpha=0.2, label='Erroneous Indexes (V)')
+                    #axs4[i//3].vlines(erroneous_bit_indexesH//Modbits, ymin=-0.05, ymax=0.05, colors='purple', alpha=0.2, label='Erroneous Indexes (H)')
                 #Highlight rough location of symbol errors
             axs4[i//3].legend(loc='lower left')
+
+            if(toggle_adaptive_equalisation == True and NPol == 2):
+                axs5[i//3].plot(abs(downsampled_rx[0]), linestyle='', marker='o', markersize='1', color='b', label='y1 mag.')
+                axs5[i//3].set_ylabel('magnitude of symbols')
+                axs5[i//3].plot(abs(downsampled_rx[1]), linestyle='', marker='o', markersize='1', color='r', label='y2 mag.')
+                axs5[i//3].set_ylim(0,3)
+                axs5[i//3].vlines(N1, colors='purple', label='N1', ymin=0, ymax=3)
+                axs5[i//3].vlines(N2, colors='green', label='N2', ymin=0, ymax=3)
+                axs5[i//3].legend()
+            
 
         
     plt.tight_layout()
