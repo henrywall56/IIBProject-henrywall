@@ -4,6 +4,7 @@ import functions as f
 import DDPhaseRecoveryTesting as dd
 import performance_evaluation as p
 from matplotlib.ticker import MaxNLocator
+from scipy.fft import fft, ifft, fftshift, ifftshift
 
 plt.rcParams['font.size'] = 12  # Change the font size
 plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
@@ -25,7 +26,6 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 def main():
     num_power = 15
     num_symbols = 2**num_power #Number of symbols in each polarisation
-    
     Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
@@ -188,9 +188,12 @@ def main():
         if(toggle_adaptive_equalisation == True and NPol == 2):
             N1=5000
             N2=0
-            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, 'CMA', 11, 1e-3, True, N1, N2, 0)
-            downsampled_rx = adaptive_eq_rx #downsampling done within adaptive equalisation
-            
+            Ndiscard=5000
+            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, 'CMA', 11, 1e-3, True, N1, N2)
+            downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
+            downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:Ndiscard], adaptive_eq_rx[:, Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
+
+            #downsampling done within adaptive equalisation
 
         else:
             adaptive_eq_rx = CD_compensated_rx
@@ -310,15 +313,15 @@ def main():
             axs4[i//3].legend(loc='lower left')
 
             if(toggle_adaptive_equalisation == True and NPol == 2):
-                axs5[i//3].plot(abs(downsampled_rx[0]), linestyle='', marker='o', markersize='1', color='b', label='y1 mag.')
+                axs5[i//3].plot(abs(adaptive_eq_rx[0]), linestyle='', marker='o', markersize='1', color='b', label='y1 mag.')
                 axs5[i//3].set_ylabel('magnitude of symbols')
-                axs5[i//3].plot(abs(downsampled_rx[1]), linestyle='', marker='o', markersize='1', color='r', label='y2 mag.')
+                axs5[i//3].plot(abs(adaptive_eq_rx[1]), linestyle='', marker='o', markersize='1', color='r', label='y2 mag.')
                 axs5[i//3].set_ylim(0,3)
                 axs5[i//3].vlines(N1, colors='purple', label='N1', ymin=0, ymax=3)
                 axs5[i//3].vlines(N2, colors='green', label='N2', ymin=0, ymax=3)
+                axs5[i//3].vlines(Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
                 axs5[i//3].legend()
-            
-
+        
         
     plt.tight_layout()
     plt.show()
