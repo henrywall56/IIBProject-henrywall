@@ -26,6 +26,7 @@ def benchmark(enabled=enable_benchmark):
 def generate_original_bits(num_symbols, Modbits, NPol):
     #If NPol == 1: generate 1D array of bits
     #If NPol == 2: generate 2D array of bits
+    #bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
     bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
 
     if(NPol==2):
@@ -1379,7 +1380,7 @@ def SSFM(input, Rs, D, Clambda, L, N, NPol):
         return input
       
 @benchmark(enable_benchmark)
-def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2, NOut):
+def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2):
         #input: 2 polarisation input signal. normalised to unit power and obtained at 2 Sa/Symbol.
         #sps: samples per symbol in input signal
         #flag: type of equalisation method used ('CMA', 'RDE', 'CMA+RDE').
@@ -1388,7 +1389,6 @@ def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2, NOut
         #singlespike: 'True' = single spike initialisation. 'False' = All taps initialised with zeros.
         #N1: number of coefficent calculations to perform prior to proper initialisation of w2H, w2V.
         #N2: number of coefficient calculations to peform prior to switch from CMA to RDE (only defined if CMA used for intialisation).
-        #NOut: number of samples to discard after equalisation.
         
         #Radii for constellations with unitary power:
         input = input/(np.sqrt(np.mean(abs(input)**2)))
@@ -1470,7 +1470,7 @@ def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2, NOut
         
         #Output Samples:
         y = np.array([y1,y2])
-        y = y[:, NOut:]
+    
         
         return y
 
