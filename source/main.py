@@ -24,16 +24,11 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 
 """
 def main():
-    num_power = 15
+    num_power = 16
     num_symbols = 2**num_power #Number of symbols in each polarisation
     Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
-
-    #Phase noise parameters
-    maxDvT = 1/(10**4) #There is a max Linewidth * T = maxDvT where T = 1/(sps*Rs)
-    Linewidth = 100*10**6 #Linewidth of laser in Hz
-    laser_power = 0 #Total laser power in dBm
     
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
@@ -67,30 +62,36 @@ def main():
         plotsize = 1.5
         modulation_format='64-QAM'
 
-    #Overwriting for quick testing:
-    #B=20
+    Rs = 400e9 #Rs symbol rate symbols/second (Baud)
 
     #Chromatic Dispersion Parameters
     D = 17#Dispersion parameter in (ps/(nm x km))
     Clambda = 1550 / (10**9) #Central lambda in (m)
     L = 1000*(10**3)#Fibre length in (m)
-    NFFT = 2**12 #Adjusted to minimise complexity
-    NOverlap = 1000 #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
+    #NOTE: need FFT size of ≈ 4 * number of symbols dispersion is spread over (@2 sps) = 4 * D*∆lambda*L * (2*Rs)= 4 * D*(Clambda/f * ∆f)*L * (2*Rs) = 4 * D*(((Clambda**2)/c)*Rs)*L * (2*Rs)
+    #NOTE: need NOverlap size of ≈ number of symbols dispersion is spread over (@2 sps) = 4 * D*∆lambda*L * (2*Rs)= 4 * D*(Clambda/f * ∆f)*L * (2*Rs) = 4 * D*(((Clambda**2)/c)*Rs)*L * (2*Rs)
+    ideal_NOverlap = D*(1e-12/(1e-9*1e3)) * (Clambda**2/299792458)*Rs*L*2*Rs
+    ideal_NFFT = 4*ideal_NOverlap
+    NFFTpower = int(np.ceil(np.log2(ideal_NFFT))) 
+    NFFT=2**NFFTpower #Adjusted to minimise complexity 
+    NOverlap = int(ideal_NOverlap) #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
+    
+    NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
     snr_begin = 9
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
-    toggle_phasenoise = False #toggle phase noise
-    toggle_phasenoisecompensation = False #toggle phase noise compensation
+    toggle_phasenoise = True #toggle phase noise
+    toggle_phasenoisecompensation = True #toggle phase noise compensation
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = False #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
-    toggle_DE = True #toggle Differential Encoding
+    toggle_DE = False #toggle Differential Encoding
     toggle_frequencyrecovery = False #toggle Frequency Recovery
-    toggle_CD = False #Toggle Chromatic Dispersion
-    toggle_NL = False
-    toggle_CD_compensation = False #Toggle Chromatic Dispersion Compensation
+    toggle_CD = True #Toggle Chromatic Dispersion
+    toggle_NL = True
+    toggle_CD_compensation = True #Toggle Chromatic Dispersion Compensation
     toggle_AIR = True
     toggle_adaptive_equalisation = True
     AIR_type = 'MI' #'MI' or 'GMI'
@@ -98,16 +99,19 @@ def main():
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
 
+    #Phase noise parameters
     #There is a max Linewidth * T = maxDvT
     #T = 1/(Rs*sps)
-    Rs = Linewidth/(sps*maxDvT) #Rs symbol rate symbols/second (Baud)
-
+    Linewidth = 100*10**3 #Linewidth of laser in Hz
+    maxDvT = Linewidth/(Rs*sps)
+    laser_power = 0 #Total laser power in dBm
 
     print('Symbol Rate:         ', Rs/1e9, 'GBaud')
     print('Bit Rate:            ', Modbits*Rs/1e9, 'GBit/s')
     print('Modulation Format:   ', modulation_format)
     print('∆νT:                 ', maxDvT)
-    print('Laser Linewidth:     ', Linewidth/1e6,'MHz')
+    print('Fibre Length:        ',L/1e3, 'km')
+    print('Laser Linewidth:     ', Linewidth/1e3,'kHz')
     print('Laser Power:         ',laser_power, 'dBm')
     print('Polarisations:       ', NPol)
     print('No. of Symbols:      ', num_symbols)
@@ -119,7 +123,10 @@ def main():
     RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
     #Pulse shaping with RRC filter
-    pulse_shaped_symbols = f.pulseshaping(symbols, sps, RRCimpulse, NPol, toggle = toggle_RRC) #if toggle False, this function just returns symbols
+    pulse_shaped_symbols = f.pulseshaping(symbols, sps, RRCimpulse, NPol, toggle = toggle_RRC) #if toggle False, this function just returns symbol
+    print('RRC Parameters:')
+    print('RRC Rolloff: ', rolloff)
+    print('RRC span: ', span)
 
     snr_db = np.arange(snr_begin,snr_begin+10,1)
     #snr_db = np.array([10])
@@ -155,7 +162,7 @@ def main():
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
 
     for i, snr_dbi in enumerate(snr_db):
-        if(snr_dbi!=15):
+        if(snr_dbi!=9):
             continue
         
         print(f'Processing SNR {snr_dbi}')
@@ -184,12 +191,25 @@ def main():
             spsCD=1
 
         CD_compensated_rx = f.CD_compensation(ADC, D, L, Clambda, Rs, NPol, spsCD, NFFT, NOverlap, toggle_CD_compensation)
-
+        
         if(toggle_adaptive_equalisation == True and NPol == 2):
-            N1=5000
-            N2=0
-            Ndiscard=5000
-            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, 'CMA', 11, 1e-3, True, N1, N2)
+            NTaps = 4 
+            mu = 5e-4 
+            N1=2000
+            N2=5000
+            Ndiscard=12000
+            if(Modbits==2):
+                AE_Type='CMA'
+            else:
+                AE_Type='CMA+RDE'
+            print('Adaptive Equalisation Parameters:')
+            print('Update used:            ', AE_Type)
+            print('Number of taps:         ', NTaps)
+            print('μ:                      ', mu)
+            print('2nd Filter starts at:   ', N1)
+            print('CMA to RDE switch at:   ', N2)
+            print('Samples discarded:      ', Ndiscard)
+            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, AE_Type, NTaps, mu, True, N1, N2)
             downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
             downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:Ndiscard], adaptive_eq_rx[:, Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
 
@@ -202,6 +222,9 @@ def main():
         frequency_recovered = f.frequency_recovery(downsampled_rx, Rs, NPol, toggle_frequencyrecovery)
         
         if(toggle_BPS==True):
+            print('BPS parameters:')
+            print('Test Angles:      ', B)
+            print('Averaging number: ',N)
             Phase_Noise_compensated_rx, thetaHat = f.BPS(frequency_recovered, Modbits, N, B, NPol, toggle_phasenoisecompensation)
         else:
             #Note DD algorithm currently only set up for NPol==1
@@ -278,7 +301,7 @@ def main():
 
             axs4[i//3].plot(1e9*np.arange(num_symbols)/(Rs*sps), theta[0::sps], label='Phase')
             #Note plotting theta before frequency recovery here
-            axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB \n Linewidth = {maxDvT}')
+            axs4[i//3].set_title(f'Phase Noise at SNR = {snr_dbi}dB \n ∆νT = {maxDvT}')
             axs4[i//3].grid(True)
             axs4[i//3].set_xlabel('Time (ns)')
             axs4[i//3].set_ylabel('Phase (rad)')
@@ -321,7 +344,31 @@ def main():
                 axs5[i//3].vlines(N2, colors='green', label='N2', ymin=0, ymax=3)
                 axs5[i//3].vlines(Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
                 axs5[i//3].legend()
-        
+
+            autocorrV = np.real(ifft(np.conjugate(fft(symbols[0]))*fft(Phase_Noise_compensated_rx[0])))
+            plt.figure()
+            plt.plot(autocorrV)
+            plt.title('V autocorrelation')
+            print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-num_symbols)
+
+            autocorrH = np.real(ifft(np.conjugate(fft(symbols[1]))*fft(Phase_Noise_compensated_rx[1])))
+            plt.figure()
+            plt.plot(autocorrH)
+            plt.title('H autocorrelation')
+            print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrH)-num_symbols)
+            
+            plt.figure()
+            plt.title('Phase of last 10 symbols, H Polarisation')
+            plt.plot(np.angle(symbols[1,-10:]), label='Sent phase')
+            plt.plot(np.angle(Phase_Noise_compensated_rx[1,-10:]), label='received phase')
+            plt.legend()
+            
+
+            plt.figure()
+            plt.title('Phase of last 10 symbols, V Polarisation')
+            plt.plot(np.angle(symbols[0,-10:]), label='received phase')
+            plt.plot(np.angle(Phase_Noise_compensated_rx[0,-10:]), label='received phase')
+            plt.legend()
         
     plt.tight_layout()
     plt.show()
