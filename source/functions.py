@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import convolve #upfirdn for up/down sampling
 import time
 from scipy.fft import fft, ifft, fftshift, ifftshift
+from tqdm import tqdm
 
 
 #References: Digital Coherent Optical Systems Textbook, Matlab Code, page 38
@@ -827,7 +828,7 @@ def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
 
         if(NPol==1):
             #Phase noise estimates
-            for i in range(zBlocks.shape[1]): #Over columns
+            for i in tqdm(range(zBlocks.shape[1]), desc="Processing BPS"): #Over columns
                 
                 zrot = np.tile(zBlocks[:, i][:, np.newaxis],(1,B)) * ThetaTestMatrix #ith column repeated 
                 zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1]), dtype=complex)
@@ -852,7 +853,7 @@ def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
 
         elif(NPol==2):
             #Phase noise estimates
-            for i in range(zBlocks.shape[1]): #Over columns
+            for i in tqdm(range(zBlocks.shape[1]), desc="Processing BPS"): #Over columns
                 
                 zrot = np.repeat(zBlocks[:,i,:][:, np.newaxis, :], B, axis=1) * ThetaTestMatrix #ith column repeated 
                 zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1], zrot.shape[2]), dtype=complex)
@@ -1236,7 +1237,7 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
     #NPol: Number of polarisations used
     #sps: number of samples per symbol in input signal "in"
     #NFFT: FFT size
-    #NOverlap: Over lap sized. if odd, forced to nearest even number > Noveralp
+    #NOverlap: Overlap size. if odd, forced to nearest even number > NOveralp
     if(toggle_CD==False):
         return input
     else:
@@ -1265,10 +1266,10 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
             else:
                 NExtra = NOverlap
                 input = np.concatenate([input[-NExtra//2:], input, input[:NExtra//2]],dtype=complex)
-
+                
             #Blocks
             Blocks = input.reshape( NFFT-NOverlap, len(input)//(NFFT-NOverlap),order='F') #order to get same reshape as matlab
-
+            
             output = np.zeros(Blocks.shape, dtype=complex)
             overlap = np.zeros(NOverlap, dtype=complex)
 
@@ -1290,6 +1291,7 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
                 output[:,i] = OutB
     
             outputT = output.T
+    
             output = outputT.reshape(-1)
     
             #Quantity of samples to discard
@@ -1303,7 +1305,7 @@ def CD_compensation(input, D1, L, CLambda, Rs, NPol, sps, NFFT, NOverlap, toggle
         elif(NPol==2):
             output0 = CD_compensation(input[0], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
             output1 = CD_compensation(input[1], D1, L, CLambda, Rs, 1, sps, NFFT, NOverlap, toggle_CD)
-
+            
             return np.array([output0,output1])
 
 @benchmark(enable_benchmark)
@@ -1342,7 +1344,7 @@ def SSFM(input, Rs, D, Clambda, L, N, NPol):
 
         temp = input*np.exp((abs(input)**2)*hhz/2)
 
-        for i in range(step_num):
+        for i in tqdm(range(step_num), desc="Processing SSFM"):
             f_temp = ifft(temp)*dispersion
             input = fft(f_temp)
             temp = input * np.exp(hhz*abs(input)**2)
@@ -1362,7 +1364,7 @@ def SSFM(input, Rs, D, Clambda, L, N, NPol):
         temp0 = input[0]*np.exp(((abs(input[0])**2)+(abs(input[1])**2))*hhz/2)  #Total power affects each polarisation
         temp1 = input[1]*np.exp(((abs(input[0])**2)+(abs(input[1])**2))*hhz/2)
         
-        for i in range(step_num):
+        for i in tqdm(range(step_num), desc="Processing SSFM"):
             
             f_temp0 = ifft(temp0)*dispersion
             
@@ -1429,7 +1431,7 @@ def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2):
 
         #Output Length:
         OutLength = int(np.floor((x.shape[1]-NTaps+1)/2))
-
+        
         #Initialising the outputs:
         y1 = np.zeros(OutLength, dtype=complex)
         y2 = np.zeros(OutLength, dtype=complex)
