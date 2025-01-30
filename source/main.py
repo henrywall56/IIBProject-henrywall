@@ -76,21 +76,21 @@ def main():
     NFFT=2**NFFTpower #Adjusted to minimise complexity 
     NOverlap = int(ideal_NOverlap) #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
     
-    NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
+    #NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
     snr_begin = 9
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
-    toggle_phasenoise = True #toggle phase noise
-    toggle_phasenoisecompensation = True #toggle phase noise compensation
+    toggle_phasenoise = False #toggle phase noise
+    toggle_phasenoisecompensation = False #toggle phase noise compensation
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = False #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
     toggle_DE = False #toggle Differential Encoding
     toggle_frequencyrecovery = False #toggle Frequency Recovery
     toggle_CD = True #Toggle Chromatic Dispersion
-    toggle_NL = True
+    toggle_NL = False
     toggle_CD_compensation = True #Toggle Chromatic Dispersion Compensation
     toggle_AIR = True
     toggle_adaptive_equalisation = True
