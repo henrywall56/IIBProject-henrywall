@@ -405,8 +405,8 @@ def matched_filter(signal, pulse_shape, NPol, toggle):
         return signal/(np.sqrt(np.mean(abs(signal)**2)))
 
 @benchmark(enable_benchmark)
-def plot_constellation(ax, symbols, title, lim=2):
-    ax.scatter(symbols.real, symbols.imag, color='blue', alpha=0.5)
+def plot_constellation(ax, symbols, title, lim=2, alpha=0.5):
+    ax.scatter(symbols.real, symbols.imag, color='blue', alpha=alpha)
     ax.set_title(title)
     ax.set_xlabel('In-Phase')
     ax.set_ylabel('Quadrature')
