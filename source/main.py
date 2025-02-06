@@ -26,7 +26,7 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 def main():
     num_power = 16
     num_symbols = 2**num_power #Number of symbols in each polarisation
-    Modbits = 2 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
     
@@ -78,7 +78,7 @@ def main():
     
     #NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
-    snr_begin = 9
+    snr_begin = 15
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -162,7 +162,7 @@ def main():
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
 
     for i, snr_dbi in enumerate(snr_db):
-        if(snr_dbi!=9):
+        if(snr_dbi!=21):
             continue
         
         print(f'Processing SNR {snr_dbi}')
@@ -193,7 +193,7 @@ def main():
         CD_compensated_rx = f.CD_compensation(ADC, D, L, Clambda, Rs, NPol, spsCD, NFFT, NOverlap, toggle_CD_compensation)
         
         if(toggle_adaptive_equalisation == True and NPol == 2):
-            NTaps = 4 
+            NTaps = 4
             mu = 5e-4 
             N1=2000
             N2=5000

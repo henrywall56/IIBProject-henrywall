@@ -35,7 +35,7 @@ plt.semilogy(snr_smooth, qpskde_smooth, color='red', label='Differential Encodin
 plt.semilogy(snr_smooth, qpsk_smooth, color='blue', label='Gray Mapping')
 plt.xlabel('SNR per bit (dB)')
 plt.ylabel('BER')
-plt.title('Bit Error Rate (BER) vs SNR per B it (dB)')
+plt.title('Bit Error Rate (BER) vs SNR per Bit (dB)')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.legend()
 plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
