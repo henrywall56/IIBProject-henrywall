@@ -1,7 +1,13 @@
 import numpy as np
 from intervaltree import IntervalTree
+import math
 #My implementation of distribution matcher
     
+def nCr(n, r):
+    if r > n:
+        return 0
+    return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
+
 def DM_prototype(C, v, k):
     # Distribution Matcher using arithmetic coding
 
@@ -75,9 +81,6 @@ def DM_prototype(C, v, k):
         #         bi = (bi-l)/(u-l)
         #         wi = wi/(u-l)
 
-
-    print(x)
-
     #Finalisation step so that the codeword identifies the source interval [bi, bi+wi)
     m = nA/(N-h) #seperating point of code interval: [0,m) is symbol A, [m,1) is symbol B
     #lower of code interval is 0
@@ -93,12 +96,11 @@ def DM_prototype(C, v, k):
     code_intervals = IntervalTree()
     code_intervals.addi(0, m, [int(1)])
     code_intervals.addi(m, 1, [int(3)])
-    H=h #number of symbols added to x by this point
-    #sorted(code_intervals.overlap(bi, bi+wi)) returns sorted list of intervals that overal with source interval [bi, bi+wi)
 
-    while(h<N):
+    while(1):
         new_intervals = []
         old_intervals = []
+ 
         for interval in code_intervals: #refine intervals
             nAtemp = nA
             nBtemp = nB
@@ -127,7 +129,7 @@ def DM_prototype(C, v, k):
     
         for iv in old_intervals:
             code_intervals.discard(iv)
-        
+
         #find intervals that overlap with source interval
         overlapping_intervals = code_intervals.overlap(bi, bi+wi)
             
@@ -170,45 +172,47 @@ def DM_prototype(C, v, k):
 
         e=0
 
-        within_intervals = [iv for iv in overlapping_intervals if iv.begin >= bi-e and iv.end <= bi+wi+e]
+        lower_border_inside = [iv for iv in overlapping_intervals if iv.begin >= bi-e and iv.begin <= bi+wi+e]
 
-        if(within_intervals):
-            largest_interval = max(within_intervals, key=lambda iv: iv.end-iv.begin)
-            finalised_seq = largest_interval.data
-            print(np.count_nonzero(x),'pre-finalisation')
-            print(len(finalised_seq),'finalised')
-            print(np.count_nonzero(x)+len(finalised_seq),'total')
-            print(N,'N')
-            x[-(N-H):-(N-H)+len(finalised_seq)] = finalised_seq
+        lower_border_sorted = sorted(lower_border_inside, key=lambda iv: iv.begin)
 
-            # nAfin = np.count_nonzero(x==1)
-            # nBfin = np.count_nonzero(x==3)
-    
-            # if(nAfin-C[0]!=0):
-            #     #C[0]-nAfin symbol A's left
-            #     x[-(C[0]-nAfin):] = np.full(C[0]-nAfin,1)
-            # elif(nBfin-C[1]!=0):
-            #     #C[1]-nBfin symbol A's left
-            #     x[-(C[1]-nBfin):] = np.full(C[1]-nBfin,3)
-           
-            break
-        
+        for iv in lower_border_sorted:
 
-    return x
+            if((iv.data.count(1)==nA)):
+                finalised_seq = iv.data
+                finalised_seq.extend([3]*(nB-iv.data.count(3)))
+                next_symbol_index = np.where(x==0)[0][0]
+                x[next_symbol_index:next_symbol_index+len(finalised_seq)] = finalised_seq
+                  
+                return x
+            elif((iv.data.count(3)==nB)):
+                finalised_seq = iv.data
+                finalised_seq.extend([1]*(nA-iv.data.count(1)))
+                next_symbol_index = np.where(x==0)[0][0]
+                x[next_symbol_index:next_symbol_index+len(finalised_seq)] = finalised_seq
+                  
+                return x
 
 
-k=7
+k=651
 
 #k = floor(log2(T^n_{P_A}))
 
+
+
+C = [350,200]
+
+N = np.sum(C)
+k=int(np.floor(math.log2(nCr(N,C[1]))))
 bits = np.random.randint(0, 2, size= k)
-
-C = [5,5]
-
 x = DM_prototype(C,bits,k)
-print(x,'x')
 
 count1 = np.count_nonzero(x==1)
 count3 = np.count_nonzero(x==3)
-print(count1)
-print(count3)
+
+print('X', x)
+print('k:', k)
+print('N:', np.sum(C))
+print('m:', C[1])
+print('N output:', count1+count3)
+print('m output:', count3)
