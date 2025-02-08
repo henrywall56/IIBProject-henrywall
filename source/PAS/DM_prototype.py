@@ -1,5 +1,5 @@
 import numpy as np
-from intervaltree import IntervalTree
+from intervaltree import IntervalTree, Interval
 import math
 #My implementation of distribution matcher
     
@@ -8,7 +8,7 @@ def nCr(n, r):
         return 0
     return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
 
-def DM_prototype(C, v, k):
+def DM_encode(C, v, k):
     # Distribution Matcher using arithmetic coding
 
     # C = {n1, n2} #composition (for 16-QAM, number of 1's and 3's in each block)
@@ -35,11 +35,11 @@ def DM_prototype(C, v, k):
             bi = bi + wi/2
             wi = wi/2
 
-        m = nA/(N-h)
+        m = (nA/(N-h))*(wc)+bc
 
         #Code interval is [bc,m) and [m,bc+wc)
        
-        if(bi+wi < m): #input interval identifies output A interval
+        if(bi+wi < m and bi > bc): #input interval identifies output A interval
             x[h] = 1
             wc = m - bc #upper is m
             bc = bc #lower
@@ -50,7 +50,8 @@ def DM_prototype(C, v, k):
             wc = 1
             nA = nA - 1 #one less symbol A left in bag
 
-        elif(bi > m): #input interval identifies output B interval
+
+        elif(bi > m and bi+wi<bc+wc): #input interval identifies output B interval
             x[h] = 3
             wc = bc+wc-m #upper is as before
             bc = m #lower
@@ -61,25 +62,34 @@ def DM_prototype(C, v, k):
             wc = 1
             nB = nB - 1 #one less symbol B left in bag
 
-        # else:  #Check for lower level candidates and rescale
-        #need to adapt to use bc, wc
-        #     u = m + (nA/(N-h))*(1-m)
-        #     l = m - (nB/(N-h))*(m-0)
-         
-        #     if ((0<bi) and (bi+wi<u)):  #if (bi,bi+wi) in [0, u)
-        #         #scale to [0,u)
-        #         bi = bi/u
-        #         wi = wi/u
+        else:  #Check for lower level candidates and rescale
+            print('else')
+            u1 = bc+wc
+            l1 = bc
 
-        #     elif((l<bi) and (bi+wi<1)): #if (bi,bi+wi) in [l,1)
-        #         #scale to [l,1)
-        #         bi = (bi-l)/(1-l)
-        #         wi = wi/(1-l)
+            u2 = max(m + (nA/(N-h))*(u1-m),1)
+            l2 = min(m - (nB/(N-h))*(m-l1),0)
+            print(u2,'u2')
+            print(l2,'l2')
 
-        #     elif((l<bi) and (bi+wi<u)): #if (bi,bi+wi) in [l,u)
-        #         #scale to [l,u)
-        #         bi = (bi-l)/(u-l)
-        #         wi = wi/(u-l)
+
+            if ((l1<=bi) and (bi+wi<=u2)): 
+                bi = (bi-l1)/(u2-l1)
+                wi = wi/(u2-l1)
+                bc = (bc-l1)/(u2-l1)
+                wc = wc/(u2-l1)
+
+            elif((bi>=l2) and (bi+wi<=u1)): 
+                bi = (bi-l2)/(u1-l2)
+                wi = wi/(u1-l2)
+                bc = (bc-l2)/(u1-l2)
+                wc = wc/(u1-l2)
+            
+            elif((bi>=l2) and (bi+wi<=u2)):
+                bi = (bi-l2)/(u2-l2)
+                wi = wi/(u2-l2)
+                bc = (bc-l2)/(u2-l2)
+                wc = wc/(u2-l2)
 
     #Finalisation step so that the codeword identifies the source interval [bi, bi+wi)
     m = nA/(N-h) #seperating point of code interval: [0,m) is symbol A, [m,1) is symbol B
@@ -123,7 +133,7 @@ def DM_prototype(C, v, k):
                 new_intervals.append((interval.begin+(nAtemp/(N-htemp))*(interval.end-interval.begin), interval.end, data))
 
             old_intervals.append(interval)
-        
+
         for iv_begin, iv_end, iv_data in new_intervals:
             code_intervals.addi(iv_begin, iv_end,iv_data)
     
@@ -172,7 +182,7 @@ def DM_prototype(C, v, k):
 
         e=0
 
-        lower_border_inside = [iv for iv in overlapping_intervals if iv.begin >= bi-e and iv.begin <= bi+wi+e]
+        lower_border_inside = [iv for iv in code_intervals if iv.begin >= bi-e and iv.begin <= bi+wi+e]
 
         lower_border_sorted = sorted(lower_border_inside, key=lambda iv: iv.begin)
 
@@ -194,25 +204,141 @@ def DM_prototype(C, v, k):
                 return x
 
 
-k=651
+def DM_decode(codeword, C, k):
+    #Distributin Matcher Decoding Function
+    #C: the number of each symbol type in the codeword
+    #k: the number of information bits in each block
 
-#k = floor(log2(T^n_{P_A}))
+    bits = []
+    nA = C[0]
+    nB = C[1]
+    N = nA + nB
 
+    S_intervals = IntervalTree() #Source intervals
 
+    m = nA/N
+    if(codeword[0]==1):
+        C_interval = Interval(0,m)
+        C_countA = 1 #number of code symbols A scanned
+        C_countB = 0 #number of code symbols B scanned
+        K_interval = Interval(0,m)
+        K_countA = 1 #number of code symbols A scanned in K interval
+        K_countB = 0 #number of code symbols B scanned in K interval
+    else:
+        C_interval = Interval(m,1) #add interval [m,1) to code intervals
+        C_countA = 0 #number of code symbols A scanned
+        C_countB = 1 #number of code symbols B scanned
+        K_interval = Interval(m,1)
+        K_countA = 0 #number of code symbols A scanned in K interval
+        K_countB = 1 #number of code symbols B scanned in K interval
 
-C = [350,200]
+    S_intervals.addi(0,0.5,0) #bit 0 is interval (0,0.5)
+    S_intervals.addi(0.5,1,1) #bit 1 is interval (0.5,1)
+    S_count = 0 #number of output bits identified
 
+    bit_identified = False
+
+    while(S_count<k):
+        # print(C_interval.end-C_interval.begin, 'code width decode')
+        # print(K_interval.end-K_interval.begin, 'K width decode')
+        # print(next(iter(S_intervals)).end-next(iter(S_intervals)).begin, 'source 0 width decode')
+
+        if((C_countA+C_countB == N) or (C_countA==nA) or (C_countB==nB)): #If read whole codeword
+            bit_interval = next(iter(S_intervals.at(C_interval.begin))) #Source interval that the lower border of the code interval is in. next(iter(.)) extracts interval from the set produced by .at()
+            bits.append(bit_interval.data)
+            bit_identified = True
+            S_count = S_count + 1
+            
+        
+        else:
+            S_containing_C = [si for si in S_intervals if si.begin <= C_interval.begin and C_interval.end <= si.end] #Source intervals that are identified by a code interval
+            if(S_containing_C): #if any code intervals are within source intervals
+                bit_interval = S_containing_C[0]
+                bits.append(bit_interval.data)
+                bit_identified = True
+                S_count = S_count + 1
+
+        if(S_count==k):
+            return bits
+        
+        if(bit_identified): #If refined source interval
+            bit_identified=False
+            if(K_interval.begin <= bit_interval.begin and bit_interval.end <= K_interval.end): #If source interval within K interval
+                u = K_interval.end
+                l = K_interval.begin
+                S_intervals.clear()
+
+                s_begin = (bit_interval.begin-l)/(u-l) #scale source interval
+                s_end = (bit_interval.end-l)/(u-l)
+
+                S_intervals.addi(s_begin, s_begin+0.5*(s_end-s_begin),0)
+                S_intervals.addi(s_begin+0.5*(s_end-s_begin),s_end,1)
+
+                next_symbol = codeword[K_countA+K_countB] #Read next symbol
+                if(next_symbol==1):
+                    mK = (nA-K_countA)/(N-K_countA-K_countB)
+                    K_countA = K_countA+1
+                    K_interval = Interval(0,mK)
+                else:
+                    mK = (nA-K_countA)/(N-K_countA-K_countB)
+                    K_countB = K_countB+1
+                    K_interval = Interval(mK,1)
+                
+                C_countA = K_countA #Reset code interval to state of K interval
+                C_countB = K_countB
+                C_interval = Interval(K_interval.begin, K_interval.end)
+
+                #K_interval is rescaled to [0,1), and then refined
+            else:
+                S_intervals.clear()
+                s_begin = bit_interval.begin
+                s_end = bit_interval.end
+                S_intervals.addi(s_begin, s_begin+0.5*(s_end-s_begin),0)
+                S_intervals.addi(s_begin+0.5*(s_end-s_begin),s_end,1)
+
+        
+        else:
+            next_symbol = codeword[C_countA+C_countB] #Read next symbol
+            if(next_symbol==1):
+                mC = (nA-C_countA)/(N-C_countA-C_countB)
+                C_countA = C_countA+1
+                C_interval = Interval(C_interval.begin, C_interval.begin+ mC*(C_interval.end-C_interval.begin))
+                
+            else:
+                mC = (nA-C_countA)/(N-C_countA-C_countB)
+                C_countB = C_countB+1
+                C_interval = Interval(C_interval.begin+ mC*(C_interval.end-C_interval.begin), C_interval.end)
+    
+    return bits
+                
+C = [30,20]
 N = np.sum(C)
 k=int(np.floor(math.log2(nCr(N,C[1]))))
 bits = np.random.randint(0, 2, size= k)
-x = DM_prototype(C,bits,k)
+
+x = DM_encode(C,bits,k)
 
 count1 = np.count_nonzero(x==1)
 count3 = np.count_nonzero(x==3)
 
-print('X', x)
 print('k:', k)
 print('N:', np.sum(C))
-print('m:', C[1])
+print('Rate:', k/N)
+print('C input:', C)
 print('N output:', count1+count3)
-print('m output:', count3)
+print('C output:', [count1,count3])
+
+bits_decoded = DM_decode(x, C, k)
+print(list(bits), 'Source Bits')
+print(list(x),'CCDM Symbols')
+print(bits_decoded, 'Decoded Bits')
+                
+if(np.array_equal(bits_decoded,bits)):
+    print('No Errors')
+else:
+    print('Errors')
+
+print(np.where(bits!=bits_decoded))
+
+        
+

@@ -8,13 +8,13 @@ def nCr(n, r):
         return 0
     return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
 
-def moutofn_encoder(m, N, u, k, w):
+def moutofn_encoder(m, N, u, k, w, blocks):
     #m: Number of "High" symbols in each codeword
     #N: Length of each codeword
     #u: Input bits
     #k: Length of each input bit block
     #w: precision parameter
-    u = u.reshape((len(u)//k, k))
+    u = u.reshape((blocks, k))
     v = np.empty((u.shape[0], N), dtype=int)
     for row in range (u.shape[0]):
         i=0
@@ -119,16 +119,20 @@ def moutofn_decoder(v, m, N, k , w):
                                 rl=rl-1
                         
     return u.flatten()
+C = [350,300]
 
-m=300
-N=660
+N=np.sum(C)
+m=C[1]
+print(m)
+print(N)
+
 w=30
 blocks=1
 k=int(np.floor(math.log2(nCr(N,m)))) #There are nCr(N,m) codewords, so have maximum log2(number of codewords) input bits.
 
 bits = np.random.randint(0, 2, size= k*blocks)
 
-A = moutofn_encoder(m,N,bits,k, w)
+A = moutofn_encoder(m,N,bits,k, w, blocks)
 print('k: ',k)
 print('m: ',m)
 print('N: ',N)
