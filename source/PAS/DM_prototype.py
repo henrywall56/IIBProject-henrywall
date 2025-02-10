@@ -3,15 +3,13 @@ from intervaltree import IntervalTree, Interval
 import math
 import mpmath
 #My implementation of distribution matcher
-
-mpmath.mp.dps = 70
     
 def nCr(n, r):
     if r > n:
         return 0
     return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
 
-def DM_encode(C, v, k):
+def DM_encode_prototype(C, v, k):
     # Distribution Matcher using arithmetic coding
 
     # C = {n1, n2} #composition (for 16-QAM, number of 1's and 3's in each block)
@@ -24,7 +22,7 @@ def DM_encode(C, v, k):
     #intialise
     nA = C[0]
     nB = C[1]
-    wi = mpmath.mpf(1) #input interval width
+    wi = 1 #input interval width
     bi = 0 #input interval base
     h=0 #Number of symbols sent to output
     bc = 0 #code interval base
@@ -32,66 +30,66 @@ def DM_encode(C, v, k):
 
     for i in range(k):
         if(v[i] == 0):
-            bi = mpmath.mpf(bi)
-            wi = mpmath.mpf(wi/2)
+            bi = bi
+            wi = wi/2
         else:
-            bi = mpmath.mpf(bi + wi/2)
-            wi = mpmath.mpf(wi/2)
+            bi = bi + wi/2
+            wi = wi/2
 
-        m = mpmath.mpf((nA/(N-h))*(wc)+bc)
+        m = (nA/(N-h))*(wc)+bc
 
         #Code interval is [bc,m) and [m,bc+wc)
        
         if(bi+wi < m and bi > bc): #input interval identifies output A interval
             x[h] = 1
-            wc = mpmath.mpf(m - bc) #upper is m
-            bc = mpmath.mpf(bc) #lower
-            bi = mpmath.mpf((bi-bc)/(wc))
+            wc = m - bc #upper is m
+            bc = bc #lower
+            bi = (bi-bc)/(wc)
             bc = 0
             h=h+1 #one more output symbol sent to buffer (one less left in bag)
-            wi = mpmath.mpf(wi / (wc))
+            wi = wi / (wc)
             wc = 1
             nA = nA - 1 #one less symbol A left in bag
 
 
         elif(bi > m and bi+wi<bc+wc): #input interval identifies output B interval
             x[h] = 3
-            wc = mpmath.mpf(bc+wc-m) #upper is as before
-            bc = mpmath.mpf(m) #lower
-            bi = mpmath.mpf((bi-bc)/(wc))
+            wc = bc+wc-m #upper is as before
+            bc = m #lower
+            bi = (bi-bc)/(wc)
             bc = 0
             h=h+1 #one more output symbol sent to buffer (one less left in bag)
-            wi = mpmath.mpf(wi / (wc))
+            wi = wi / (wc)
             wc = 1
             nB = nB - 1 #one less symbol B left in bag
 
         else:  #Check for lower level candidates and rescale
-            u1 = mpmath.mpf(bc+wc)
-            l1 = mpmath.mpf(bc)
+            u1 = bc+wc
+            l1 = bc
 
-            u2 = mpmath.mpf(max(m + (nA/(N-h))*(u1-m),1))
-            l2 = mpmath.mpf(min(m - (nB/(N-h))*(m-l1),0))
+            u2 = max(m + (nA/(N-h))*(u1-m),1)
+            l2 = min(m - (nB/(N-h))*(m-l1),0)
 
             if ((l1<=bi) and (bi+wi<=u2)): 
-                bi = mpmath.mpf((bi-l1)/(u2-l1))
-                wi = mpmath.mpf(wi/(u2-l1))
-                bc = mpmath.mpf((bc-l1)/(u2-l1))
-                wc = mpmath.mpf(wc/(u2-l1))
+                bi = (bi-l1)/(u2-l1)
+                wi = wi/(u2-l1)
+                bc = (bc-l1)/(u2-l1)
+                wc = wc/(u2-l1)
 
             elif((bi>=l2) and (bi+wi<=u1)): 
-                bi = mpmath.mpf((bi-l2)/(u1-l2))
-                wi = mpmath.mpf(wi/(u1-l2))
-                bc = mpmath.mpf((bc-l2)/(u1-l2))
-                wc = mpmath.mpf(wc/(u1-l2))
+                bi = (bi-l2)/(u1-l2)
+                wi = wi/(u1-l2)
+                bc = (bc-l2)/(u1-l2)
+                wc = wc/(u1-l2)
             
             elif((bi>=l2) and (bi+wi<=u2)):
-                bi = mpmath.mpf((bi-l2)/(u2-l2))
-                wi = mpmath.mpf(wi/(u2-l2))
-                bc = mpmath.mpf((bc-l2)/(u2-l2))
-                wc = mpmath.mpf(wc/(u2-l2))
+                bi = (bi-l2)/(u2-l2)
+                wi = wi/(u2-l2)
+                bc = (bc-l2)/(u2-l2)
+                wc = wc/(u2-l2)
 
     #Finalisation step so that the codeword identifies the source interval [bi, bi+wi)
-    m = mpmath.mpf(nA/(N-h)) #seperating point of code interval: [0,m) is symbol A, [m,1) is symbol B
+    m = nA/(N-h) #seperating point of code interval: [0,m) is symbol A, [m,1) is symbol B
     #lower of code interval is 0
     #upper of code interval is 1
     #bi is base of source interval
@@ -163,8 +161,8 @@ def DM_encode(C, v, k):
         scaled_intervals = []
 
         for iv in overlapping_intervals: #scale intervals
-            iv_begin = mpmath.mpf((iv.begin-l)/(u-l))
-            iv_end = mpmath.mpf((iv.end-l)/(u-l))
+            iv_begin = (iv.begin-l)/(u-l)
+            iv_end = (iv.end-l)/(u-l)
             # iv_begin = iv.begin
             # iv_end = iv.end
             scaled_intervals.append((iv_begin,iv_end,iv.data))
@@ -176,8 +174,8 @@ def DM_encode(C, v, k):
         
         #code_intervals contains only the overlapping intervals scaled from 0 to 1
         
-        bi = mpmath.mpf((bi-l)/(u-l))
-        wi = mpmath.mpf(wi/(u-l))
+        bi = (bi-l)/(u-l)
+        wi = wi/(u-l)
 
         e=0
 
@@ -203,7 +201,7 @@ def DM_encode(C, v, k):
                 return x
 
 
-def DM_decode(codeword, C, k):
+def DM_decode_prototype(codeword, C, k):
     #Distributin Matcher Decoding Function
     #C: the number of each symbol type in the codeword
     #k: the number of information bits in each block
@@ -267,8 +265,8 @@ def DM_decode(codeword, C, k):
                 l = K_interval.begin
                 S_intervals.clear()
 
-                s_begin = mpmath.mpf((bit_interval.begin-l)/(u-l)) #scale source interval
-                s_end = mpmath.mpf((bit_interval.end-l)/(u-l))
+                s_begin = (bit_interval.begin-l)/(u-l) #scale source interval
+                s_end = (bit_interval.end-l)/(u-l)
 
                 S_intervals.addi(s_begin, s_begin+0.5*(s_end-s_begin),0)
                 S_intervals.addi(s_begin+0.5*(s_end-s_begin),s_end,1)
@@ -310,12 +308,12 @@ def DM_decode(codeword, C, k):
     
     return bits
                 
-C = [300,200]
+C = [40,20]
 N = np.sum(C)
 k=int(np.floor(math.log2(nCr(N,C[1]))))
 bits = np.random.randint(0, 2, size= k)
 
-x = DM_encode(C,bits,k)
+x = DM_encode_prototype(C,bits,k)
 
 count1 = np.count_nonzero(x==1)
 count3 = np.count_nonzero(x==3)
@@ -327,7 +325,7 @@ print('C input:', C)
 print('N output:', count1+count3)
 print('C output:', [count1,count3])
 
-bits_decoded = DM_decode(x, C, k)
+bits_decoded = DM_decode_prototype(x, C, k)
 print(list(bits), 'Source Bits')
 print(list(x),'CCDM Symbols')
 print(bits_decoded, 'Decoded Bits')

@@ -1,17 +1,15 @@
 import numpy as np
 from intervaltree import IntervalTree, Interval
 import math
-import mpmath
+import matplotlib.pyplot as plt
 #My implementation of distribution matcher
-
-mpmath.mp.dps = 70
     
 def nCr(n, r):
     if r > n:
         return 0
     return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
 
-def DM_encode_64QAM(C, v, k):
+def DM_encode(C, v, k):
     # Distribution Matcher using arithmetic coding
 
     # C = {nA, nB, nC, nD} #composition (for 64-QAM, number of 1's, 3's, 5's and 7's in each block)
@@ -250,7 +248,7 @@ def DM_encode_64QAM(C, v, k):
 
     return x
 
-def DM_decode_64QAM(codeword, C, k):
+def DM_decode(codeword, C, k):
     #Distributin Matcher Decoding Function
     #C: the number of each symbol type in the codeword
     #k: the number of information bits in each block
@@ -422,15 +420,31 @@ def DM_decode_64QAM(codeword, C, k):
     
     return bits
 
+Modbits = 6
 
+if(Modbits==4):
+    signal_points = [1,3]
+    λ = 0.04
+    N = 50
+    A = 0
+    for i in signal_points:
+        A += np.exp(-λ*np.abs(i)**2)
+    C = [int(N*np.exp(-λ)/A),int(N*np.exp(-λ*9)/A),0,0]
+    k = int(np.floor(math.log2(nCr(N,C[1]))))
+    bits = np.random.randint(0, 2, size= k)
 
-C = [13,10,5,4]
-N = np.sum(C)
-k=50
-bits = np.random.randint(0, 2, size= k)
+if(Modbits==6):
+    signal_points = [1,3,5,7]
+    λ = 0.06
+    N = 40
+    A = 0
+    for i in signal_points:
+        A += np.exp(-λ*np.abs(i)**2)
+    C = [int(N*np.exp(-λ)/A),int(N*np.exp(-λ*9)/A),int(N*np.exp(-λ*25)/A),int(N*np.exp(-λ*49)/A)]
+    k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])))))
+    bits = np.random.randint(0, 2, size= k)
 
-
-x = DM_encode_64QAM(C,bits,k)
+x = DM_encode(C,bits,k)
 count1 = np.count_nonzero(x==1)
 count3 = np.count_nonzero(x==3)
 count5 = np.count_nonzero(x==5)
@@ -443,7 +457,7 @@ print('C input:', C)
 print('N output:', count1+count3+count5+count7)
 print('C output:', [count1,count3,count5,count7])
 
-bits_decoded = DM_decode_64QAM(x, C, k)
+bits_decoded = DM_decode(x, C, k)
 print(list(bits), 'Source Bits')
 print(list(x),'CCDM Symbols')
 print(bits_decoded, 'Decoded Bits')
@@ -454,3 +468,24 @@ else:
     print('Errors')
 
 print(np.where(bits!=bits_decoded))
+
+
+labels = [1,3,5,7]
+values = [count1/N, count3/N, count5/N, count7/N ]
+
+# Create bar chart
+plt.bar(labels, values, color=['red', 'orange', 'green', 'blue'])
+plt.xlabel("Number")
+plt.ylabel("Probability")
+plt.title("Symbol Probabilities in Codeword")
+plt.plot()
+
+
+xaxis = np.linspace(0, 7, 400)  # Define range of x
+MB_constant = 0
+for i in xaxis:
+    MB_constant += np.exp(-λ*np.abs(i)**2)
+MB_dist = np.exp(-λ * np.abs(xaxis)**2)*2*np.sqrt(λ/np.pi)
+plt.plot(xaxis, MB_dist)
+
+plt.show()
