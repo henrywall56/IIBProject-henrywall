@@ -2,7 +2,7 @@ import numpy as np
 from intervaltree import IntervalTree, Interval
 import math
 import mpmath
-#My implementation of distribution matcher
+#My implementation of distribution matcher for 16-QAM only
     
 def nCr(n, r):
     if r > n:
