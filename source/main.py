@@ -5,6 +5,12 @@ import DDPhaseRecoveryTesting as dd
 import performance_evaluation as p
 from matplotlib.ticker import MaxNLocator
 from scipy.fft import fft, ifft, fftshift, ifftshift
+import PAS.PAS_architecture as pas
+import PAS.distribution_matcher
+import PAS.ldpc_jossy
+from collections import Counter
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.cm as cm
 
 plt.rcParams['font.size'] = 12  # Change the font size
 plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
@@ -26,9 +32,10 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 def main():
     num_power = 16
     num_symbols = 2**num_power #Number of symbols in each polarisation
+                               #Overwritten if PAS used
     Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    NPol = 2 #Number of polarisations used
+    NPol = 1 #Number of polarisations used
     
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
@@ -59,10 +66,10 @@ def main():
         modulation_format='16-QAM'
     elif(Modbits==6):
         B=64 #Number of trial angles
-        plotsize = 1.5
+        plotsize = 3
         modulation_format='64-QAM'
 
-    Rs = 400e9 #Rs symbol rate symbols/second (Baud)
+    Rs = 100e9 #Rs symbol rate symbols/second (Baud)
 
     #Chromatic Dispersion Parameters
     D = 17#Dispersion parameter in (ps/(nm x km))
@@ -78,7 +85,7 @@ def main():
     
     #NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
-    snr_begin = 15
+    snr_begin = 10
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -89,12 +96,13 @@ def main():
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
     toggle_DE = False #toggle Differential Encoding
     toggle_frequencyrecovery = False #toggle Frequency Recovery
-    toggle_CD = True #Toggle Chromatic Dispersion
+    toggle_CD = False #Toggle Chromatic Dispersion
     toggle_NL = False
-    toggle_CD_compensation = True #Toggle Chromatic Dispersion Compensation
+    toggle_CD_compensation = False #Toggle Chromatic Dispersion Compensation
     toggle_AIR = True
-    toggle_adaptive_equalisation = True
+    toggle_adaptive_equalisation = False
     AIR_type = 'MI' #'MI' or 'GMI'
+    toggle_PAS = True
     
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -106,27 +114,63 @@ def main():
     maxDvT = Linewidth/(Rs*sps)
     laser_power = 0 #Total laser power in dBm
 
-    print('Symbol Rate:         ', Rs/1e9, 'GBaud')
-    print('Bit Rate:            ', Modbits*Rs/1e9, 'GBit/s')
     print('Modulation Format:   ', modulation_format)
     print('∆νT:                 ', maxDvT)
-    print('Fibre Length:        ',L/1e3, 'km')
+    print('Fibre Length:        ', L/1e3, 'km')
     print('Laser Linewidth:     ', Linewidth/1e3,'kHz')
     print('Laser Power:         ',laser_power, 'dBm')
     print('Polarisations:       ', NPol)
-    print('No. of Symbols:      ', num_symbols)
+    print('--------------------------------------')
     
-    original_bits = f.generate_original_bits(num_symbols, Modbits, NPol) #NPol-dimensional array
+    if(toggle_PAS==False):
+        original_bits = f.generate_original_bits(num_symbols, Modbits, NPol) #NPol-dimensional array
 
-    symbols = f.generate_symbols(original_bits, Modbits, NPol, toggle_DE) #NPol-dimensional array
+        symbols = f.generate_symbols(original_bits, Modbits, NPol, toggle_DE) #NPol-dimensional array
+        print('--------------------------------------')
+        print('No. of Symbols:                ', num_symbols)
+        print('Symbol Rate:         ', Rs/1e9, 'GBaud')
+        print('Bit Rate:            ', Modbits*Rs/1e9, 'GBit/s')
+        print('--------------------------------------')
 
+    else:
+        λpas = 0.05
+        kpas, Npas, Cpas, LDPC_encoderpas = pas.PAS_parameters(Modbits, λpas)
+        blockspas = num_symbols//kpas #so approach roughly num_symbols
+        original_bits = np.random.randint(0, 2, size= kpas*blockspas*2*NPol)
+        symbols = pas.PAS_encoder(Cpas, original_bits, kpas, blockspas, Modbits, LDPC_encoderpas)
+        pas.PAS_barplot(symbols)
+        PAS_normalisation = np.sum(abs(symbols)**2)/len(symbols)
+        symbols = symbols/np.sqrt(PAS_normalisation)
+
+        if(NPol==1):
+            num_symbols = len(symbols)
+        else:
+            num_symbols = symbols.shape[1]
+        
+        print('--------------------------------------')
+        print('PAS Parameters:')
+        print('Info Bits per Block k:         ', kpas)
+        print('Symbols per Block N:           ', Npas)
+        print('Number of Blocks:              ', blockspas)
+        print('Maxwell-Boltzmann Parameter λ: ', λpas)
+        print('Rate (bits/symbol):            ', 2*kpas/Npas) 
+        print('--------------------------------------')
+        print('No. of Symbols:      ', num_symbols)
+        print('Symbol Rate:         ', Rs/1e9, 'GBaud')
+        print('Bit Rate:            ', 2*(kpas/Npas)*Rs/1e9, 'GBit/s')
+        print('--------------------------------------')
+
+
+        
     RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
     #Pulse shaping with RRC filter
     pulse_shaped_symbols = f.pulseshaping(symbols, sps, RRCimpulse, NPol, toggle = toggle_RRC) #if toggle False, this function just returns symbol
+    print('--------------------------------------')
     print('RRC Parameters:')
     print('RRC Rolloff: ', rolloff)
     print('RRC span: ', span)
+    print('--------------------------------------')
 
     snr_db = np.arange(snr_begin,snr_begin+10,1)
     #snr_db = np.array([10])
@@ -162,12 +206,11 @@ def main():
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
 
     for i, snr_dbi in enumerate(snr_db):
-        if(snr_dbi!=21):
-            continue
         
         print(f'Processing SNR {snr_dbi}')
-        Gaussian_noise_signal = f.add_noise(Laser_Eoutput, snr_dbi, sps, Modbits, NPol, toggle_AWGNnoise) 
-
+        
+        Gaussian_noise_signal, sigma = f.add_noise(Laser_Eoutput, snr_dbi, sps, Modbits, NPol, toggle_AWGNnoise) 
+        
         if(toggle_NL==False):
             
             CD_NL_signal = f.add_chromatic_dispersion(Gaussian_noise_signal, sps, Rs, D, Clambda, L, NPol, toggle_CD)
@@ -202,6 +245,7 @@ def main():
                 AE_Type='CMA'
             else:
                 AE_Type='CMA+RDE'
+            print('--------------------------------------')
             print('Adaptive Equalisation Parameters:')
             print('Update used:            ', AE_Type)
             print('Number of taps:         ', NTaps)
@@ -209,6 +253,7 @@ def main():
             print('2nd Filter starts at:   ', N1)
             print('CMA to RDE switch at:   ', N2)
             print('Samples discarded:      ', Ndiscard)
+            print('--------------------------------------')
             adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, AE_Type, NTaps, mu, True, N1, N2)
             downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
             downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:Ndiscard], adaptive_eq_rx[:, Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
@@ -222,16 +267,27 @@ def main():
         frequency_recovered = f.frequency_recovery(downsampled_rx, Rs, NPol, toggle_frequencyrecovery)
         
         if(toggle_BPS==True):
+            print('--------------------------------------')
             print('BPS parameters:')
             print('Test Angles:      ', B)
             print('Averaging number: ',N)
+            print('--------------------------------------')
             Phase_Noise_compensated_rx, thetaHat = f.BPS(frequency_recovered, Modbits, N, B, NPol, toggle_phasenoisecompensation)
         else:
             #Note DD algorithm currently only set up for NPol==1
             #Note this currently uses SNR per bit, which should be changed to per symbol
             Phase_Noise_compensated_rx, thetaHat = dd.DD_phase_noise_compensation(downsampled_rx, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
 
-        if(toggle_DE==True):
+        if(toggle_PAS==True):
+            if(NPol==1):
+
+                demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, λpas, np.sqrt(sigma), blockspas, LDPC_encoderpas, kpas, Cpas, PAS_normalisation)
+                erroneous_indexes = np.where(np.abs(symbols*np.sqrt(PAS_normalisation) - demod_symbols)>1e-9)[0]
+
+            elif(NPol==2):
+                continue
+
+        elif(toggle_DE==True):
             if(NPol==1):
                 demod_bits = f.Differential_decode_symbols(Phase_Noise_compensated_rx, Modbits)
                 #Plot erroneous symbols as the symbols that correspond to bit errors
@@ -273,7 +329,10 @@ def main():
                 if(AIR_type=='GMI'):
                     AIR[i] = p.AIR_SDBW(symbols, original_bits, Phase_Noise_compensated_rx, Modbits)
                 elif(AIR_type=='MI'):
-                    AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
+                    if(toggle_PAS==True):
+                        AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
+                    else:
+                        AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
         elif(NPol==2):
             #BER[i] = (np.sum(original_bits[0] != demod_bits[0])+np.sum(original_bits[1] != demod_bits[1]))/(NPol*num_symbols*Modbits)
             BER[i] = np.sum(original_bits[0] != demod_bits[0])/(num_symbols*Modbits)
@@ -345,30 +404,30 @@ def main():
                 axs5[i//3].vlines(Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
                 axs5[i//3].legend()
 
-            autocorrV = np.real(ifft(np.conjugate(fft(symbols[0]))*fft(Phase_Noise_compensated_rx[0])))
-            plt.figure()
-            plt.plot(autocorrV)
-            plt.title('V autocorrelation')
-            print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-num_symbols)
+            # autocorrV = np.real(ifft(np.conjugate(fft(symbols[0]))*fft(Phase_Noise_compensated_rx[0])))
+            # plt.figure()
+            # plt.plot(autocorrV)
+            # plt.title('V autocorrelation')
+            # print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-num_symbols)
 
-            autocorrH = np.real(ifft(np.conjugate(fft(symbols[1]))*fft(Phase_Noise_compensated_rx[1])))
-            plt.figure()
-            plt.plot(autocorrH)
-            plt.title('H autocorrelation')
-            print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrH)-num_symbols)
+            # autocorrH = np.real(ifft(np.conjugate(fft(symbols[1]))*fft(Phase_Noise_compensated_rx[1])))
+            # plt.figure()
+            # plt.plot(autocorrH)
+            # plt.title('H autocorrelation')
+            # print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrH)-num_symbols)
             
-            plt.figure()
-            plt.title('Phase of last 10 symbols, H Polarisation')
-            plt.plot(np.angle(symbols[1,-10:]), label='Sent phase')
-            plt.plot(np.angle(Phase_Noise_compensated_rx[1,-10:]), label='received phase')
-            plt.legend()
+            # plt.figure()
+            # plt.title('Phase of last 10 symbols, H Polarisation')
+            # plt.plot(np.angle(symbols[1,-10:]), label='Sent phase')
+            # plt.plot(np.angle(Phase_Noise_compensated_rx[1,-10:]), label='received phase')
+            # plt.legend()
             
 
-            plt.figure()
-            plt.title('Phase of last 10 symbols, V Polarisation')
-            plt.plot(np.angle(symbols[0,-10:]), label='received phase')
-            plt.plot(np.angle(Phase_Noise_compensated_rx[0,-10:]), label='received phase')
-            plt.legend()
+            # plt.figure()
+            # plt.title('Phase of last 10 symbols, V Polarisation')
+            # plt.plot(np.angle(symbols[0,-10:]), label='received phase')
+            # plt.plot(np.angle(Phase_Noise_compensated_rx[0,-10:]), label='received phase')
+            # plt.legend()
         
     plt.tight_layout()
     plt.show()

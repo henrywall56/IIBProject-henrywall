@@ -2,7 +2,7 @@ import numpy as np
 from intervaltree import IntervalTree, Interval
 import math
 import mpmath
-#My implementation of distribution matcher for 16-QAM only
+#My implementation of distribution matcher for 16-QAM only - No longer in use
     
 def nCr(n, r):
     if r > n:
@@ -22,11 +22,12 @@ def DM_encode_prototype(C, v, k):
     #intialise
     nA = C[0]
     nB = C[1]
-    wi = 1 #input interval width
+    p=0 #precision parameter
+    wi = 2**p #input interval width
     bi = 0 #input interval base
     h=0 #Number of symbols sent to output
     bc = 0 #code interval base
-    wc = 1 #code interval width
+    wc = 2**p #code interval width
 
     for i in range(k):
         if(v[i] == 0):
@@ -44,11 +45,11 @@ def DM_encode_prototype(C, v, k):
             x[h] = 1
             wc = m - bc #upper is m
             bc = bc #lower
-            bi = (bi-bc)/(wc)
+            bi = (bi-bc)/((wc)/2**p)
             bc = 0
             h=h+1 #one more output symbol sent to buffer (one less left in bag)
-            wi = wi / (wc)
-            wc = 1
+            wi = wi / ((wc)/2**p)
+            wc = 2**p
             nA = nA - 1 #one less symbol A left in bag
 
 
@@ -56,11 +57,11 @@ def DM_encode_prototype(C, v, k):
             x[h] = 3
             wc = bc+wc-m #upper is as before
             bc = m #lower
-            bi = (bi-bc)/(wc)
+            bi = (bi-bc)/((wc)/2**p)
             bc = 0
             h=h+1 #one more output symbol sent to buffer (one less left in bag)
-            wi = wi / (wc)
-            wc = 1
+            wi = wi / ((wc)/2**p)
+            wc = 2**p
             nB = nB - 1 #one less symbol B left in bag
 
         else:  #Check for lower level candidates and rescale
@@ -71,25 +72,25 @@ def DM_encode_prototype(C, v, k):
             l2 = min(m - (nB/(N-h))*(m-l1),0)
 
             if ((l1<=bi) and (bi+wi<=u2)): 
-                bi = (bi-l1)/(u2-l1)
-                wi = wi/(u2-l1)
-                bc = (bc-l1)/(u2-l1)
-                wc = wc/(u2-l1)
+                bi = (bi-l1)/((u2-l1)/2**p)
+                wi = wi/((u2-l1)/2**p)
+                bc = (bc-l1)/((u2-l1)/2**p)
+                wc = wc/((u2-l1)/2**p)
 
             elif((bi>=l2) and (bi+wi<=u1)): 
-                bi = (bi-l2)/(u1-l2)
-                wi = wi/(u1-l2)
-                bc = (bc-l2)/(u1-l2)
-                wc = wc/(u1-l2)
+                bi = (bi-l2)/((u1-l2)/2**p)
+                wi = wi/((u1-l2)/2**p)
+                bc = (bc-l2)/((u1-l2)/2**p)
+                wc = wc/((u1-l2)/2**p)
             
             elif((bi>=l2) and (bi+wi<=u2)):
-                bi = (bi-l2)/(u2-l2)
-                wi = wi/(u2-l2)
-                bc = (bc-l2)/(u2-l2)
-                wc = wc/(u2-l2)
+                bi = (bi-l2)/((u2-l2)/2**p)
+                wi = wi/((u2-l2)/2**p)
+                bc = (bc-l2)/((u2-l2)/2**p)
+                wc = wc/((u2-l2)/2**p)
 
     #Finalisation step so that the codeword identifies the source interval [bi, bi+wi)
-    m = nA/(N-h) #seperating point of code interval: [0,m) is symbol A, [m,1) is symbol B
+    m = (nA/(N-h))*2**p #seperating point of code interval: [0,m) is symbol A, [m,1) is symbol B
     #lower of code interval is 0
     #upper of code interval is 1
     #bi is base of source interval
@@ -97,12 +98,10 @@ def DM_encode_prototype(C, v, k):
     #nA of symbol A left
     #nB of symbol B left
     #N-h symbols left to add to output
-    if(m==0 or m==1):
-        return x
     
     code_intervals = IntervalTree()
     code_intervals.addi(0, m, [int(1)])
-    code_intervals.addi(m, 1, [int(3)])
+    code_intervals.addi(m, 2**p, [int(3)])
 
     while(1):
         new_intervals = []
@@ -118,7 +117,7 @@ def DM_encode_prototype(C, v, k):
                     htemp = htemp + 1
                 elif(d==3):
                     nBtemp = nBtemp - 1
-                    htemp = htemp +1
+                    htemp = htemp + 1
 
             if(nAtemp>0):
                 data = interval.data.copy()
@@ -161,8 +160,8 @@ def DM_encode_prototype(C, v, k):
         scaled_intervals = []
 
         for iv in overlapping_intervals: #scale intervals
-            iv_begin = (iv.begin-l)/(u-l)
-            iv_end = (iv.end-l)/(u-l)
+            iv_begin = (iv.begin-l)/((u-l)/2**p)
+            iv_end = (iv.end-l)/((u-l)/2**p)
             # iv_begin = iv.begin
             # iv_end = iv.end
             scaled_intervals.append((iv_begin,iv_end,iv.data))
@@ -174,8 +173,8 @@ def DM_encode_prototype(C, v, k):
         
         #code_intervals contains only the overlapping intervals scaled from 0 to 1
         
-        bi = (bi-l)/(u-l)
-        wi = wi/(u-l)
+        bi = (bi-l)/((u-l)/2**p)
+        wi = wi/((u-l)/2**p)
 
         e=0
 
@@ -211,9 +210,11 @@ def DM_decode_prototype(codeword, C, k):
     nB = C[1]
     N = nA + nB
 
+    p=0 #precision parameter
+
     S_intervals = IntervalTree() #Source intervals
 
-    m = nA/N
+    m = 2**p*nA/N
     if(codeword[0]==1):
         C_interval = Interval(0,m)
         C_countA = 1 #number of code symbols A scanned
@@ -222,15 +223,15 @@ def DM_decode_prototype(codeword, C, k):
         K_countA = 1 #number of code symbols A scanned in K interval
         K_countB = 0 #number of code symbols B scanned in K interval
     else:
-        C_interval = Interval(m,1) #add interval [m,1) to code intervals
+        C_interval = Interval(m,2**p) #add interval [m,1) to code intervals
         C_countA = 0 #number of code symbols A scanned
         C_countB = 1 #number of code symbols B scanned
-        K_interval = Interval(m,1)
+        K_interval = Interval(m,2**p)
         K_countA = 0 #number of code symbols A scanned in K interval
         K_countB = 1 #number of code symbols B scanned in K interval
 
-    S_intervals.addi(0,0.5,0) #bit 0 is interval (0,0.5)
-    S_intervals.addi(0.5,1,1) #bit 1 is interval (0.5,1)
+    S_intervals.addi(0,0.5*2**p,0) #bit 0 is interval (0,0.5)
+    S_intervals.addi(0.5*2**p,2**p,1) #bit 1 is interval (0.5,1)
     S_count = 0 #number of output bits identified
 
     bit_identified = False
@@ -265,8 +266,8 @@ def DM_decode_prototype(codeword, C, k):
                 l = K_interval.begin
                 S_intervals.clear()
 
-                s_begin = (bit_interval.begin-l)/(u-l) #scale source interval
-                s_end = (bit_interval.end-l)/(u-l)
+                s_begin = (bit_interval.begin-l)/((u-l)/2**p) #scale source interval
+                s_end = (bit_interval.end-l)/((u-l)/2**p)
 
                 S_intervals.addi(s_begin, s_begin+0.5*(s_end-s_begin),0)
                 S_intervals.addi(s_begin+0.5*(s_end-s_begin),s_end,1)
@@ -275,11 +276,11 @@ def DM_decode_prototype(codeword, C, k):
                 if(next_symbol==1):
                     mK = (nA-K_countA)/(N-K_countA-K_countB)
                     K_countA = K_countA+1
-                    K_interval = Interval(0,mK)
+                    K_interval = Interval(0,mK*2**p)
                 else:
                     mK = (nA-K_countA)/(N-K_countA-K_countB)
                     K_countB = K_countB+1
-                    K_interval = Interval(mK,1)
+                    K_interval = Interval(mK*2**p,2**p)
                 
                 C_countA = K_countA #Reset code interval to state of K interval
                 C_countB = K_countB
@@ -308,7 +309,7 @@ def DM_decode_prototype(codeword, C, k):
     
     return bits
                 
-C = [40,20]
+C = [45,25]
 N = np.sum(C)
 k=int(np.floor(math.log2(nCr(N,C[1]))))
 bits = np.random.randint(0, 2, size= k)

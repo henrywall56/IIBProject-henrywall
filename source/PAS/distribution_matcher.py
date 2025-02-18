@@ -27,7 +27,7 @@ def DM_encode(C, v, k,blocks):
         nB = C[1]
         nC = C[2]
         nD = C[3]
-
+        
         wi = 1 #input interval width
         bi = 0 #input interval base
         h=0 #Number of symbols sent to output
@@ -38,6 +38,7 @@ def DM_encode(C, v, k,blocks):
             if(v[row][i] == 0):
                 bi = bi
                 wi = wi/2
+
             else:
                 bi = bi + wi/2
                 wi = wi/2
@@ -440,7 +441,7 @@ plot=False
 if(plot==True):
     Modbits = 6
     blocks = 1000
-
+    
     if(Modbits==4):
         signal_points = [1,3]
         λ = 0.06
