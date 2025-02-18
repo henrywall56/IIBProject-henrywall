@@ -370,7 +370,7 @@ def add_noise(signal, snrb_db, sps, Modbits, NPol, toggle_AWGNnoise):
             stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*snr))
             noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
 
-            return signal + noise 
+            return signal + noise, stdev
         elif(NPol==2):
             snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
 
@@ -379,10 +379,10 @@ def add_noise(signal, snrb_db, sps, Modbits, NPol, toggle_AWGNnoise):
             noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))
             noise1 = stdev1 * (np.random.randn(len(signal[1])) + 1j * np.random.randn(len(signal[1])))
 
-            return np.array([signal[0]+noise0, signal[1]+noise1], dtype=complex)
+            return np.array([signal[0]+noise0, signal[1]+noise1], dtype=complex), 0.5*(stdev0+stdev1)
 
     else:
-        return signal
+        return signal,0
 
 @benchmark(enable_benchmark)
 def matched_filter(signal, pulse_shape, NPol, toggle):

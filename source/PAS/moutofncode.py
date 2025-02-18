@@ -119,18 +119,21 @@ def moutofn_decoder(v, m, N, k , w):
                                 rl=rl-1
                         
     return u.flatten()
-C = [350,300]
+C = [45,25]
+
 
 N=np.sum(C)
 m=C[1]
 print(m)
 print(N)
 
-w=30
+w=8
 blocks=1
 k=int(np.floor(math.log2(nCr(N,m)))) #There are nCr(N,m) codewords, so have maximum log2(number of codewords) input bits.
-
+k=62
 bits = np.random.randint(0, 2, size= k*blocks)
+
+bits = np.array([0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1])
 
 A = moutofn_encoder(m,N,bits,k, w, blocks)
 print('k: ',k)
@@ -161,3 +164,4 @@ plt.title("Frequency of 1 and 3 in Vector A")
 
 # Show the plot
 plt.show()
+
