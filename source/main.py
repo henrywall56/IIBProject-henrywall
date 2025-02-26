@@ -1,3 +1,5 @@
+#Have to run from source/PAS/ldpc_jossy as root directory
+
 import numpy as np
 import matplotlib.pyplot as plt
 import functions as f
@@ -85,7 +87,7 @@ def main():
     
     #NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
-    snr_begin = 10
+    snr_begin = 30
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -147,9 +149,9 @@ def main():
         else:
             num_symbols = symbols.shape[1]
         
-        print('--------------------------------------')
+        
         print('PAS Parameters:')
-        print('Info Bits per Block k:         ', kpas)
+        print('Info Bits per Block k-N:         ', kpas)
         print('Symbols per Block N:           ', Npas)
         print('Number of Blocks:              ', blockspas)
         print('Maxwell-Boltzmann Parameter λ: ', λpas)
@@ -157,7 +159,7 @@ def main():
         print('--------------------------------------')
         print('No. of Symbols:      ', num_symbols)
         print('Symbol Rate:         ', Rs/1e9, 'GBaud')
-        print('Bit Rate:            ', 2*(kpas/Npas)*Rs/1e9, 'GBit/s')
+        print('Bit Rate:            ', 2*((kpas)/Npas)*Rs/1e9, 'GBit/s')
         print('--------------------------------------')
 
 
@@ -204,12 +206,15 @@ def main():
     Elaser, theta = f.Laser(laser_power, Linewidth, sps, Rs, num_symbols, NPol, toggle_phasenoise) #Laser phase noise
 
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
+    laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
+    Laser_Eoutput = Laser_Eoutput/np.sqrt(laser_norm) #normal
 
     for i, snr_dbi in enumerate(snr_db):
         
         print(f'Processing SNR {snr_dbi}')
         
         Gaussian_noise_signal, sigma = f.add_noise(Laser_Eoutput, snr_dbi, sps, Modbits, NPol, toggle_AWGNnoise) 
+        print('-------',sigma)
         
         if(toggle_NL==False):
             
@@ -281,7 +286,7 @@ def main():
         if(toggle_PAS==True):
             if(NPol==1):
 
-                demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, λpas, np.sqrt(sigma), blockspas, LDPC_encoderpas, kpas, Cpas, PAS_normalisation)
+                demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, λpas, sigma, blockspas, LDPC_encoderpas, kpas, Cpas, PAS_normalisation)
                 erroneous_indexes = np.where(np.abs(symbols*np.sqrt(PAS_normalisation) - demod_symbols)>1e-9)[0]
 
             elif(NPol==2):
@@ -518,3 +523,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Run in ldpc_jossy root directory:
+# gcc -lm -shared -fPIC -o bin/c_ldpc.so src/c_ldpc.c
+# gcc -o bin/results2csv src/results2csv.c

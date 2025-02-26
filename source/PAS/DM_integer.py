@@ -9,7 +9,13 @@ def nCr(n, r):
         return 0
     return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
 
-def DM_encode(C, v, k,blocks):
+def integer_fraction(nSymb, N, h, u, b):
+    numerator = nSymb * (u-b) + (N-h)//2 #adding (N-h)//2 for rounding
+    m = numerator // (N-h) + b
+    return m
+
+
+def DM_encode(C, v, k,blocks,p):
     # Distribution Matcher using arithmetic coding
 
     # C = {nA, nB, nC, nD} #composition (for 64-QAM, number of 1's, 3's, 5's and 7's in each block)
@@ -20,6 +26,7 @@ def DM_encode(C, v, k,blocks):
     v = v.reshape((blocks,k))
     N = np.sum(C)
     x = np.zeros((blocks,N),dtype=int)
+
     for row in range(blocks):
         
         #intialise
@@ -28,121 +35,112 @@ def DM_encode(C, v, k,blocks):
         nC = C[2]
         nD = C[3]
         
-        wi = 1 #input interval width
+        ui = (2**p) #input interval width
         bi = 0 #input interval base
+        
         h=0 #Number of symbols sent to output
         bc = 0 #code interval base
-        wc = 1 #code interval width
-
+        uc = (2**p) #code interval width
+        
         for i in range(k):
+            
             if(v[row][i] == 0):
                 bi = bi
-                wi = wi/2
+                ui = round(bi+(ui-bi)/2)
 
             else:
-                bi = bi + wi/2
-                wi = wi/2
+                bi = round(bi+(ui-bi)/2)+1
+                ui=ui
 
-            m1 = (nA/(N-h))*(wc)+bc
-            m2 = ((nA+nB)/(N-h))*(wc) + bc
-            m3 = ((nA+nB+nC)/(N-h))*(wc) + bc
+            m1 = round((nA/(N-h))*(uc-bc)) +bc
+            m2 = round(((nA+nB)/(N-h))*(uc-bc)) +bc
+            m3 = round(((nA+nB+nC)/(N-h))*(uc-bc)) +bc
 
             #Code interval is [bc,m) and [m,bc+wc)
-        
-            if(bi+wi < m1 and bi > bc): #input interval identifies output A interval
+            
+            if(bi >= bc and ui<=m1): #input interval identifies output A interval
+                print('A')
                 x[row][h] = 1
-                wc = m1 - bc #upper is m1
+                uc = m1 #upper is m1
                 bc = bc #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = round(((bi-bc)/(uc-bc))*(2**p))
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                ui = round(((ui-bc)/(uc-bc))*(2**p))
+                bc=0
+                uc = 1*(2**p)
                 nA = nA - 1 #one less symbol A left in bag
 
 
-            elif(bi > m1 and bi+wi<m2): #input interval identifies output B interval
+            elif(bi >= m1 and ui<=m2): #input interval identifies output B interval
+                print('B')
                 x[row][h] = 3
-                wc = m2-m1 #upper is m2
+                uc=m2 #upper is m2
                 bc = m1 #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = round(((bi-bc)/(uc-bc))*(2**p))
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                ui = round(((ui-bc)/(uc-bc))*(2**p))
+                bc=0
+                uc = 1*(2**p)
                 nB = nB - 1 #one less symbol B left in bag
 
-            elif(bi > m2 and bi+wi<m3): #input interval identifies output B interval
+            elif(bi >= m2 and ui<=m3): #input interval identifies output B interval
                 x[row][h] = 5
-                wc = m3-m2 #upper is m3
+                uc=m3 #upper is m3
                 bc = m2 #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = round(((bi-bc)/(uc-bc))*(2**p))
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                ui = round(((ui-bc)/(uc-bc))*(2**p))
+                bc = 0
+                uc = 1*(2**p)
                 nC = nC- 1 #one less symbol B left in bag
 
-            elif(bi > m3 and bi+wi<bc+wc): #input interval identifies output B interval
+            elif(bi >= m3 and ui<=uc): #input interval identifies output B interval
                 x[row][h] = 7
-                wc = bc+wc-m3 #upper is as before
+                uc=uc #upper is as before
                 bc = m3 #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = round(((bi-bc)/(uc-bc))*(2**p))
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                ui = round(((ui-bc)/(uc-bc))*(2**p))
+                bc = 0
+                uc = 1*(2**p)
                 nD= nD - 1 #one less symbol B left in bag
 
             # else:  #Check for lower level candidates and rescale ONLY FOR 16-QAM SO FAR
-                
-            #     u1 = bc+wc
+            #     u1 = uc
             #     l1 = bc
-            #     ui = bi + wi
-            #     u2 = m1 + (nA/(N-h))*(u1-m1)
-            #     l2 = m1 - (nB/(N-h))*(m1-l1)
-
+            #     u2 = m1 + round((nA/(N-h))*(u1-m1))
+            #     l2 = m1 - round((nB/(N-h))*(m1-l1))
+            #     print('----')       
             #     if((bi>=l2) and (ui<=u2)):
             #         print('else1')
-            #         bi = (bi-l2)/(u2-l2)
-            #         wi = wi/(u2-l2)
-            #         # bc = l2
-            #         # wc = u2 - l2
-            #         bc = (bc-l2)/(u2-l2)
-            #         wc = wc/(u2-l2)
+            #         bi = round(((bi-l2)/(u2-l2))*(2**p))
+            #         ui = round(((ui-l2)/(u2-l2))*(2**p))
+            #         bc = round(((bc-l2)/(u2-l2))*(2**p))
+            #         uc = round(((uc-l2)/(u2-l2))*(2**p))
 
             #     elif ((bi>=l1) and (ui<=u2)): 
             #         print('else2')
-            #         bi = (bi-l1)/(u2-l1)
-            #         wi = wi/(u2-l1)
-            #         # bc = l1
-            #         # wc = u2 - l1
-            #         bc = (bc-l1)/(u2-l1)
-            #         wc = wc/(u2-l1)
+            #         bi = round(((bi-l1)/(u2-l1))*(2**p))
+            #         ui = round(((ui-l1)/(u2-l1))*(2**p))
+            #         bc = round(((bc-l1)/(u2-l1))*(2**p))
+            #         uc = round(((uc-l1)/(u2-l1))*(2**p))
 
             #     elif((bi>=l2) and (ui<=u1)): 
             #         print('else3')
-            #         bi = (bi-l2)/(u1-l2)
-            #         wi = wi/(u1-l2)
-            #         # bc = l2
-            #         # wc = u1 - l2
-            #         bc = (bc-l2)/(u1-l2)
-            #         wc = wc/(u1-l2)
-
-
-        #Finalisation step so that the codeword identifies the source interval [bi, bi+wi)
-        m1 = (nA/(N-h))*(wc)+bc
-        m2 = ((nA+nB)/(N-h))*(wc)+bc
-        m3 = ((nA+nB+nC)/(N-h))*(wc)+bc
-        #lower of code interval is 0
-        #upper of code interval is 1
-        #bi is base of source interval
-        #wi is width of source interval
-        #nA of symbol A left
-        #nB of symbol B left
-        #N-h symbols left to add to output
+            #         bi = round(((bi-l2)/(u1-l2))*(2**p))
+            #         ui = round(((ui-l2)/(u1-l2))*(2**p))
+            #         bc = round(((bc-l2)/(u1-l2))*(2**p))
+            #         uc = round(((uc-l2)/(u1-l2))*(2**p))
         
+
+
+        #Finalisation step so that the codeword identifies the source interval [bi, ui)
+        m1 = round((nA/(N-h))*(uc-bc))+bc
+        m2 = round(((nA+nB)/(N-h))*(uc-bc)) + bc
+        m3 = m2 + round(((nA+nB+nC)/(N-h))*(uc-bc)) + bc
+
         code_intervals = IntervalTree()
+
         if(nA!=0):
             code_intervals.addi(bc, m1, [int(1)])
         if(nB!=0):
@@ -150,14 +148,18 @@ def DM_encode(C, v, k,blocks):
         if(nC!=0):
             code_intervals.addi(m2, m3, [int(5)])
         if(nD!=0):
-            code_intervals.addi(m3, bc+wc, [int(7)])
-        i=0
-
+            code_intervals.addi(m3, uc, [int(7)])
+        print(x)
         print(bi)
-        print(bi+wi)
-        
-        
+        print(ui)
+        print(bc)
+        print(uc)
+        print(2**p)
+        print(nA)
+        print(nB)
+        print(C)
         while(1):
+            
             new_intervals = []
             old_intervals = []
     
@@ -184,24 +186,27 @@ def DM_encode(C, v, k,blocks):
                 if(nAtemp>0):
                     data = interval.data.copy()
                     data.append(int(1))
-                    m1 = interval.begin+(nAtemp/(N-htemp))*(interval.end-interval.begin)
+                    m1 = interval.begin+round((nAtemp/(N-htemp))*(interval.end-interval.begin))
                     new_intervals.append((interval.begin, m1, data))
+                    
                 if(nBtemp>0):
                     data = interval.data.copy()
                     data.append(int(3))
-                    m1 = interval.begin+(nAtemp/(N-htemp))*(interval.end-interval.begin)
-                    m2 = interval.begin+((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin)
+                    m1 = interval.begin+round((nAtemp/(N-htemp))*(interval.end-interval.begin))
+                    m2 = interval.begin+round(((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin))
                     new_intervals.append((m1, m2, data))
+                    
                 if(nCtemp>0):
                     data = interval.data.copy()
                     data.append(int(5))
-                    m2 = interval.begin+((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin)
-                    m3 = interval.begin+((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin)
+                    m2 = interval.begin+round(((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin))
+                    m3 = interval.begin+round(((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin))
                     new_intervals.append((m2, m3, data))
+
                 if(nDtemp>0):
                     data = interval.data.copy()
                     data.append(int(7))
-                    m3 = interval.begin+((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin)
+                    m3 = interval.begin+round(((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin))
                     new_intervals.append((m3, interval.end, data))
 
                 old_intervals.append(interval)
@@ -212,23 +217,28 @@ def DM_encode(C, v, k,blocks):
             for iv in old_intervals:
                 code_intervals.discard(iv)
 
-            #find intervals that overlap with source interval
-            overlapping_intervals = code_intervals.overlap(bi, bi+wi)
+            # #find intervals that overlap with source interval
+            # overlapping_intervals = IntervalTree()
+            # for iv in code_intervals:
+            #     if((bi<=iv.begin<=ui) or (bi<=iv.end<=ui) or (iv.begin<=bi<=iv.end) or (iv.begin<=ui<=iv.end)):
+            #         overlapping_intervals.addi(iv.begin,iv.end,iv.data)
+           
+            overlapping_intervals = code_intervals.overlap(bi, ui)
                 
-            epsilon_overlap = []
-            epsilon = 0
-            for interval in overlapping_intervals:
-                # Calculate the overlap size (intersection length)
-                overlap_start = max(interval.begin, bi)
-                overlap_end = min(interval.end, bi+wi)
-                overlap_size = overlap_end - overlap_start
+            # epsilon_overlap = []
+            # epsilon = 0
+            # for interval in overlapping_intervals:
+            #     # Calculate the overlap size (intersection length)
+            #     overlap_start = max(interval.begin, bi)
+            #     overlap_end = min(interval.end, ui)
+            #     overlap_size = overlap_end - overlap_start
                 
-                # If the overlap size is less than epsilon, add to discard list
-                if overlap_size < epsilon:
-                    epsilon_overlap.append(interval)
-            # Discard intervals after the loop finishes
-            for interval in epsilon_overlap:
-                overlapping_intervals.discard(interval)
+            #     # If the overlap size is less than epsilon, add to discard list
+            #     if overlap_size < epsilon:
+            #         epsilon_overlap.append(interval)
+            # # Discard intervals after the loop finishes
+            # for interval in epsilon_overlap:
+            #     overlapping_intervals.discard(interval)
 
             l = min(iv.begin for iv in overlapping_intervals)
             u = max(iv.end for iv in overlapping_intervals)
@@ -236,10 +246,11 @@ def DM_encode(C, v, k,blocks):
             scaled_intervals = []
 
             for iv in overlapping_intervals: #scale intervals
-                iv_begin = (iv.begin-l)/(u-l)
-                iv_end = (iv.end-l)/(u-l)
+                iv_begin = round(((iv.begin-l)/(u-l))*(2**p))
+                iv_end = round(((iv.end-l)/(u-l))*(2**p))
                 # iv_begin = iv.begin
                 # iv_end = iv.end
+                
                 scaled_intervals.append((iv_begin,iv_end,iv.data))
 
             code_intervals.clear()
@@ -248,14 +259,13 @@ def DM_encode(C, v, k,blocks):
                 code_intervals.addi(iv_begin, iv_end,iv_data)
             
             #code_intervals contains only the overlapping intervals scaled from 0 to 1
-            
-            bi = (bi-l)/(u-l)
-            wi = wi/(u-l)
+
+            bi = round(((bi-l)/(u-l))*(2**p))
+            ui = round(((ui-l)/(u-l))*(2**p))
 
             e=0
-            print(wi,'w')
 
-            lower_border_inside = [iv for iv in code_intervals if iv.begin >= bi-e and iv.begin <= bi+wi+e]
+            lower_border_inside = [iv for iv in code_intervals if iv.begin >= bi-e and iv.begin <= ui+e]
 
             lower_border_sorted = sorted(lower_border_inside, key=lambda iv: iv.begin)
 
@@ -299,7 +309,7 @@ def DM_encode(C, v, k,blocks):
 
     return x.flatten()
 
-def DM_decode(codeword, C, k, blocks):
+def DM_decode(codeword, C, k, blocks,p):
     #Distributin Matcher Decoding Function
     #C: the number of each symbol type in the codeword
     #k: the number of information bits in each block
@@ -309,7 +319,7 @@ def DM_decode(codeword, C, k, blocks):
     nC = C[2]
     nD = C[3]
 
-    N = nA + nB +nC + nD
+    N = nA + nB + nC + nD
 
     codeword = codeword.reshape((blocks,N))
 
@@ -317,9 +327,9 @@ def DM_decode(codeword, C, k, blocks):
         bit_row = []
         S_intervals = IntervalTree() #Source intervals
 
-        m1 = (nA/(N))
-        m2 = m1 + (nB/(N))
-        m3 = m2 + (nC/(N))
+        m1 = round((nA/(N))*(2**p))
+        m2 = round(((nA+nB)/(N))*(2**p))
+        m3 = round(((nA+nB+nC)/(N))*(2**p))
 
         if(codeword[row][0]==1):
             C_interval = Interval(0,m1)
@@ -355,19 +365,19 @@ def DM_decode(codeword, C, k, blocks):
             K_countC = 1
             K_countD = 0
         elif(codeword[row][0]==7):
-            C_interval = Interval(m3,1) #add interval [m,1) to code intervals
+            C_interval = Interval(m3,2**p) #add interval [m,1) to code intervals
             C_countA = 0 #number of code symbols A scanned
             C_countB = 0 #number of code symbols B scanned
             C_countC = 0
             C_countD = 1
-            K_interval = Interval(m3,1)
+            K_interval = Interval(m3,2**p)
             K_countA = 0 #number of code symbols A scanned in K interval
             K_countB = 0 #number of code symbols B scanned in K interval
             K_countC = 0
             K_countD = 1
 
-        S_intervals.addi(0,0.5,0) #bit 0 is interval (0,0.5)
-        S_intervals.addi(0.5,1,1) #bit 1 is interval (0.5,1)
+        S_intervals.addi(0,2**(p-1),0) #bit 0 is interval (0,0.5)
+        S_intervals.addi(2**(p-1),(2**p),1) #bit 1 is interval (0.5,1)
         S_count = 0 #number of output bits identified
 
         bit_identified = False
@@ -402,34 +412,31 @@ def DM_decode(codeword, C, k, blocks):
                     l = K_interval.begin
                     S_intervals.clear()
 
-                    s_begin = (bit_interval.begin-l)/(u-l) #scale source interval
-                    s_end = (bit_interval.end-l)/(u-l)
+                    s_begin = round(((bit_interval.begin-l)/(u-l))*(2**p)) #scale source interval
+                    s_end = round(((bit_interval.end-l)/(u-l))*(2**p))
 
-                    S_intervals.addi(s_begin, s_begin+0.5*(s_end-s_begin),0)
-                    S_intervals.addi(s_begin+0.5*(s_end-s_begin),s_end,1)
+                    S_intervals.addi(s_begin, s_begin+round(0.5*(s_end-s_begin)),0)
+                    S_intervals.addi(s_begin+round(0.5*(s_end-s_begin)),s_end,1)
 
                     next_symbol = codeword[row][K_countA+K_countB+K_countC+K_countD] #Read next symbol
                     if(next_symbol==1):
-                        mK1 = (nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD)
+                        mK1 = round(((nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
                         K_countA = K_countA+1
                         K_interval = Interval(0,mK1)
                     elif(next_symbol==3):
-                        mK1 = (nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD)
-                        mK2 = mK1 + (nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD)
+                        mK1 = round(((nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        mK2 = round(((nA-K_countA + nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
                         K_countB = K_countB+1
                         K_interval = Interval(mK1,mK2)
                     elif(next_symbol==5):
-                        mK1 = (nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD)
-                        mK2 = mK1 + (nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD)
-                        mK3 = mK2 + (nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD)
+                        mK2 = round(((nA-K_countA + nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        mK3 = round(((nA-K_countA + nB-K_countB + nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
                         K_countC = K_countC+1
                         K_interval = Interval(mK2,mK3)
                     elif(next_symbol==7):
-                        mK1 = (nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD)
-                        mK2 = mK1 + (nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD)
-                        mK3 = mK2 + (nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD)
+                        mK3 = round(((nA-K_countA + nB-K_countB + nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
                         K_countD = K_countD+1
-                        K_interval = Interval(mK3,1)
+                        K_interval = Interval(mK3,2**p)
                     
                     C_countA = K_countA #Reset code interval to state of K interval
                     C_countB = K_countB
@@ -442,34 +449,31 @@ def DM_decode(codeword, C, k, blocks):
                     S_intervals.clear()
                     s_begin = bit_interval.begin
                     s_end = bit_interval.end
-                    S_intervals.addi(s_begin, s_begin+0.5*(s_end-s_begin),0)
-                    S_intervals.addi(s_begin+0.5*(s_end-s_begin),s_end,1)
+                    S_intervals.addi(s_begin, s_begin+round(0.5*(s_end-s_begin)),0)
+                    S_intervals.addi(s_begin+round(0.5*(s_end-s_begin)),s_end,1)
 
             
             else:
                 next_symbol = codeword[row][C_countA+C_countB+C_countC+C_countD] #Read next symbol
                 if(next_symbol==1):
-                    mC1 = C_interval.begin + ((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
+                    mC1 = C_interval.begin + round(((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
                     C_countA = C_countA+1
                     C_interval = Interval(C_interval.begin, mC1)
                     
                 elif(next_symbol==3):
-                    mC1 = C_interval.begin + ((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
-                    mC2 = mC1 + ((nB-C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
+                    mC1 = C_interval.begin + round(((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    mC2 = C_interval.begin + round(((nA-C_countA + nB - C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
                     C_countB = C_countB+1
                     C_interval = Interval(mC1,mC2)
 
                 elif(next_symbol==5):
-                    mC1 = C_interval.begin + ((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
-                    mC2 = mC1 + ((nB-C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
-                    mC3 = mC2 + ((nC-C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
+                    mC2 = C_interval.begin + round(((nA-C_countA + nB - C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    mC3 = C_interval.begin + round(((nA-C_countA + nB - C_countB + nC - C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
                     C_countC = C_countC+1
                     C_interval = Interval(mC2,mC3)
 
                 elif(next_symbol==7):
-                    mC1 = C_interval.begin + ((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
-                    mC2 = mC1 + ((nB-C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
-                    mC3 = mC2 + ((nC-C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin)
+                    mC3 = C_interval.begin + round(((nA-C_countA + nB - C_countB + nC - C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
                     C_countD = C_countD+1
                     C_interval = Interval(mC3,C_interval.end)
         
@@ -480,13 +484,12 @@ plot=True
 if(plot==True):
     Modbits = 4
     blocks = 1
-    np.random.seed(1)
+    # np.random.seed(3)
     
     if(Modbits==4):
         signal_points = [1,3]
         λ = 0.06
-        # N_target = 50
-        N_target = 100
+        N_target = 500
         A = 0
         for i in signal_points:
             A += np.exp(-λ*np.abs(i)**2)
@@ -494,15 +497,11 @@ if(plot==True):
         N = np.sum(C)
         k = int(np.floor(math.log2(nCr(N,C[1]))))
         bits = np.random.randint(0, 2, size= k*blocks)
-        # bits = np.ones(k)
-
+        
     if(Modbits==6):
         signal_points = [1,3,5,7]
-        # λ = 0.04
-        # N_target = 32
         λ = 0.05
-        N_target = 100
-
+        N_target =100
         A = 0
         for i in signal_points:
             A += np.exp(-λ*np.abs(i)**2)
@@ -510,10 +509,15 @@ if(plot==True):
         k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])))))
         N = np.sum(C)
         bits = np.random.randint(0, 2, size= k*blocks)
+        # bits = np.ones(k)
 
+    p_encode = 60
+    p_decode = 60
 
-    x = DM_encode(C,bits,k,blocks)
+    x = DM_encode(C,bits,k,blocks,p_encode)
+
     print(x)
+
     count1 = np.count_nonzero(x==1)
     count3 = np.count_nonzero(x==3)
     count5 = np.count_nonzero(x==5)
@@ -526,10 +530,11 @@ if(plot==True):
     print('C input:', C)
     print('N output average:', (count1+count3+count5+count7)/blocks)
     print('C output average:', [count1/blocks,count3/blocks,count5/blocks,count7/blocks])
+ 
 
-    bits_decoded = DM_decode(x, C, k, blocks)
+    bits_decoded = DM_decode(x, C, k, blocks,p_decode)
     print(bits, 'Source Bits')
-    print(list(x),'CCDM Symbols')
+    print(x,'CCDM Symbols')
     print(bits_decoded, 'Decoded Bits')
                     
     if(np.array_equal(bits_decoded,bits)):
