@@ -5,9 +5,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
 import math
 
-testing=False
+testing=True
 if(testing==False):
-    import PAS.distribution_matcher as DM
+    import PAS.DMencode as DMencode
+    import PAS.DMencode as DMdecode
     from PAS.ldpc_jossy.py import ldpc
     import sys
     import os
@@ -16,7 +17,8 @@ if(testing==False):
     import functions as f
 
 else:
-    import distribution_matcher as DM
+    import DMencode as DMencode
+    import DMdecode as DMdecode
     from ldpc_jossy.py import ldpc
     import sys
     import os
@@ -34,8 +36,8 @@ def PAS_encoder(C, bits, k, blocks, Modbits, LDPC_encoder):
     bitsI = bits[::2] #in-phase bits
     bitsQ = bits[1::2] #quadrature bits
     N = np.sum(C)
-    amplitudesI = DM.DM_encode(C, bitsI, k, blocks).reshape((blocks,N))
-    amplitudesQ = DM.DM_encode(C, bitsQ, k, blocks).reshape((blocks,N))
+    amplitudesI = DMencode.DMencode(C, bitsI, k, blocks).reshape((blocks,N))
+    amplitudesQ = DMencode.DMencode(C, bitsQ, k, blocks).reshape((blocks,N))
     XI = PAS_signs(amplitudesI, Modbits, LDPC_encoder).flatten()
     XQ = PAS_signs(amplitudesQ, Modbits, LDPC_encoder).flatten()
     X = XI + 1j*XQ
@@ -255,14 +257,17 @@ def PAS_parameters(Modbits,λ):
 
     elif(Modbits==6):
         signal_points = [1,3,5,7]
-        N_target = 34
+        N_target = 402
         const = 0
         for i in signal_points:
             const += np.exp(-λ*np.abs(i)**2)
         C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),int(N_target*np.exp(-λ*25)/const),int(N_target*np.exp(-λ*49)/const)]
+        C[0] += 1 #to get N to 400
         k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])))))
         N = np.sum(C)
-        LDPC_encoder = ldpc.code(standard = '802.16', rate = '2/3', z=4, ptype='A')
+        print(N)
+        LDPC_encoder = ldpc.code(standard = '802.16', rate = '2/3', z=50, ptype='A')
+        print(LDPC_encoder.K)
         #LDPC_encoder.K should be (m-1)N
 
     return k, N, C, LDPC_encoder
@@ -297,8 +302,8 @@ def PAS_decoder(Y, Modbits, λ, sigma, blocks, LDPC_encoder, k, C, norm):
 
     Y_decoded = YI_decoded + 1j*YQ_decoded
 
-    bits_decodedI = DM.DM_decode(np.abs(YI_decoded), C, k, blocks) #Decode the distribution matching to the information bits
-    bits_decodedQ = DM.DM_decode(np.abs(YQ_decoded), C, k, blocks)
+    bits_decodedI = DMdecode.DMdecode(np.abs(YI_decoded), C, k, blocks) #Decode the distribution matching to the information bits
+    bits_decodedQ = DMdecode.DMdecode(np.abs(YQ_decoded), C, k, blocks)
 
     bits_decoded = np.array([bit for pair in zip(bits_decodedI, bits_decodedQ) for bit in pair])
 
@@ -323,7 +328,7 @@ def PAS_barplot(X):
     ax = fig.add_subplot(111, projection='3d')
 
     # Define bar width
-    bar_width = 0.4
+    bar_width = 0.1
 
     # Plot bars with color-coding
     for x, y, h, color in zip(real_parts, imag_parts, probabilities, colors):
@@ -338,11 +343,12 @@ def PAS_barplot(X):
 
 if(testing==True):
 
-    Modbits = 4
-    blocks = 1
-    np.random.seed(1)
+    Modbits = 6
+    blocks = 100
+    # np.random.seed(2)
+    λ = 0.03
 
-    k, N, C, λ, LDPC_encoder = PAS_parameters(Modbits)
+    k, N, C, LDPC_encoder = PAS_parameters(Modbits,λ)
 
     bits = np.random.randint(0, 2, size= k*blocks*2) #In-Phase and Quadrature
     X = PAS_encoder(C, bits, k, blocks, Modbits, LDPC_encoder)

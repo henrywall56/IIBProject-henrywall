@@ -15,6 +15,7 @@ def integer_fraction(nSymb, N, h, u, b):
     return m
 
 
+
 def DM_encode(C, v, k,blocks,p):
     # Distribution Matcher using arithmetic coding
 
@@ -49,12 +50,15 @@ def DM_encode(C, v, k,blocks,p):
                 ui = round(bi+(ui-bi)/2)
 
             else:
-                bi = round(bi+(ui-bi)/2)+1
+                bi = round(bi+(ui-bi)/2)
                 ui=ui
 
-            m1 = round((nA/(N-h))*(uc-bc)) +bc
-            m2 = round(((nA+nB)/(N-h))*(uc-bc)) +bc
-            m3 = round(((nA+nB+nC)/(N-h))*(uc-bc)) +bc
+            # m1 = round((nA/(N-h))*(uc-bc)) +bc
+            # m2 = round(((nA+nB)/(N-h))*(uc-bc)) +bc
+            # m3 = round(((nA+nB+nC)/(N-h))*(uc-bc)) +bc
+            m1 = integer_fraction(nA, N, h, uc, bc)
+            m2 = integer_fraction(nA+nB, N, h, uc, bc)
+            m3 = integer_fraction(nA+nB+nC, N, h, uc, bc)
 
             #Code interval is [bc,m) and [m,bc+wc)
             
@@ -77,8 +81,10 @@ def DM_encode(C, v, k,blocks,p):
                 uc=m2 #upper is m2
                 bc = m1 #lower
                 bi = round(((bi-bc)/(uc-bc))*(2**p))
+                # bi = integer_rescale(bi, bc, uc, p)
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
                 ui = round(((ui-bc)/(uc-bc))*(2**p))
+                # ui = integer_rescale(ui, bc, uc, p)
                 bc=0
                 uc = 1*(2**p)
                 nB = nB - 1 #one less symbol B left in bag
@@ -135,9 +141,12 @@ def DM_encode(C, v, k,blocks,p):
 
 
         #Finalisation step so that the codeword identifies the source interval [bi, ui)
-        m1 = round((nA/(N-h))*(uc-bc))+bc
-        m2 = round(((nA+nB)/(N-h))*(uc-bc)) + bc
-        m3 = m2 + round(((nA+nB+nC)/(N-h))*(uc-bc)) + bc
+        # m1 = round((nA/(N-h))*(uc-bc))+bc
+        # m2 = round(((nA+nB)/(N-h))*(uc-bc)) + bc
+        # m3 = m2 + round(((nA+nB+nC)/(N-h))*(uc-bc)) + bc
+        m1 = integer_fraction(nA, N, h, uc, bc)
+        m2 = integer_fraction(nA+nB, N, h, uc, bc)
+        m3 = integer_fraction(nA+nB+nC, N, h, uc, bc)
 
         code_intervals = IntervalTree()
 
@@ -186,27 +195,33 @@ def DM_encode(C, v, k,blocks,p):
                 if(nAtemp>0):
                     data = interval.data.copy()
                     data.append(int(1))
-                    m1 = interval.begin+round((nAtemp/(N-htemp))*(interval.end-interval.begin))
+                    # m1 = interval.begin+round((nAtemp/(N-htemp))*(interval.end-interval.begin))
+                    m1 = integer_fraction(nAtemp, N, htemp, interval.end, interval.begin)
                     new_intervals.append((interval.begin, m1, data))
                     
                 if(nBtemp>0):
                     data = interval.data.copy()
                     data.append(int(3))
-                    m1 = interval.begin+round((nAtemp/(N-htemp))*(interval.end-interval.begin))
-                    m2 = interval.begin+round(((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin))
+                    # m1 = interval.begin+round((nAtemp/(N-htemp))*(interval.end-interval.begin))
+                    # m2 = interval.begin+round(((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin))
+                    m1 = integer_fraction(nAtemp, N, htemp, interval.end, interval.begin)
+                    m2 = integer_fraction(nAtemp+nBtemp, N, htemp, interval.end, interval.begin)
                     new_intervals.append((m1, m2, data))
                     
                 if(nCtemp>0):
                     data = interval.data.copy()
                     data.append(int(5))
-                    m2 = interval.begin+round(((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin))
-                    m3 = interval.begin+round(((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin))
+                    # m2 = interval.begin+round(((nAtemp+nBtemp)/(N-htemp))*(interval.end-interval.begin))
+                    # m3 = interval.begin+round(((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin))
+                    m2 = integer_fraction(nAtemp+nBtemp, N, htemp, interval.end, interval.begin)
+                    m3 = integer_fraction(nAtemp+nBtemp+nCtemp, N, htemp, interval.end, interval.begin)
                     new_intervals.append((m2, m3, data))
 
                 if(nDtemp>0):
                     data = interval.data.copy()
                     data.append(int(7))
-                    m3 = interval.begin+round(((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin))
+                    # m3 = interval.begin+round(((nAtemp+nBtemp+nCtemp)/(N-htemp))*(interval.end-interval.begin))
+                    m3 = integer_fraction(nAtemp+nBtemp+nCtemp, N, htemp, interval.end, interval.begin)
                     new_intervals.append((m3, interval.end, data))
 
                 old_intervals.append(interval)
@@ -327,9 +342,12 @@ def DM_decode(codeword, C, k, blocks,p):
         bit_row = []
         S_intervals = IntervalTree() #Source intervals
 
-        m1 = round((nA/(N))*(2**p))
-        m2 = round(((nA+nB)/(N))*(2**p))
-        m3 = round(((nA+nB+nC)/(N))*(2**p))
+        # m1 = round((nA/(N))*(2**p))
+        # m2 = round(((nA+nB)/(N))*(2**p))
+        # m3 = round(((nA+nB+nC)/(N))*(2**p))
+        m1 = integer_fraction(nA, N, 0, 2**p, 0)
+        m2 = integer_fraction(nA+nB, N, 0, 2**p, 0)
+        m3 = integer_fraction(nA+nB+nC, N, 0, 2**p, 0)
 
         if(codeword[row][0]==1):
             C_interval = Interval(0,m1)
@@ -420,21 +438,27 @@ def DM_decode(codeword, C, k, blocks,p):
 
                     next_symbol = codeword[row][K_countA+K_countB+K_countC+K_countD] #Read next symbol
                     if(next_symbol==1):
-                        mK1 = round(((nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        # mK1 = round(((nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        mK1 = integer_fraction(nA-K_countA, N, K_countA+K_countB+K_countC+K_countD, 2**p, 0)
                         K_countA = K_countA+1
                         K_interval = Interval(0,mK1)
                     elif(next_symbol==3):
-                        mK1 = round(((nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
-                        mK2 = round(((nA-K_countA + nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        # mK1 = round(((nA-K_countA)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        # mK2 = round(((nA-K_countA + nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        mK1 = integer_fraction(nA-K_countA, N, K_countA+K_countB+K_countC+K_countD, 2**p, 0)
+                        mK2 = integer_fraction(nA-K_countA+nB-K_countB, N, K_countA+K_countB+K_countC+K_countD, 2**p, 0)
                         K_countB = K_countB+1
                         K_interval = Interval(mK1,mK2)
                     elif(next_symbol==5):
-                        mK2 = round(((nA-K_countA + nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
-                        mK3 = round(((nA-K_countA + nB-K_countB + nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        # mK2 = round(((nA-K_countA + nB-K_countB)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        # mK3 = round(((nA-K_countA + nB-K_countB + nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        mK2 = integer_fraction(nA-K_countA+nB-K_countB, N, K_countA+K_countB+K_countC+K_countD, 2**p, 0)
+                        mK3 = integer_fraction(nA-K_countA+nB-K_countB+nB-K_countC, N, K_countA+K_countB+K_countC+K_countD, 2**p, 0)
                         K_countC = K_countC+1
                         K_interval = Interval(mK2,mK3)
                     elif(next_symbol==7):
-                        mK3 = round(((nA-K_countA + nB-K_countB + nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        # mK3 = round(((nA-K_countA + nB-K_countB + nC-K_countC)/(N-K_countA-K_countB-K_countC-K_countD))*(2**p))
+                        mK3 = integer_fraction(nA-K_countA+nB-K_countB+nB-K_countC, N, K_countA+K_countB+K_countC+K_countD, 2**p, 0)
                         K_countD = K_countD+1
                         K_interval = Interval(mK3,2**p)
                     
@@ -456,24 +480,30 @@ def DM_decode(codeword, C, k, blocks,p):
             else:
                 next_symbol = codeword[row][C_countA+C_countB+C_countC+C_countD] #Read next symbol
                 if(next_symbol==1):
-                    mC1 = C_interval.begin + round(((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    # mC1 = C_interval.begin + round(((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    mC1 = integer_fraction(nA-C_countA, N, C_countA+C_countB+C_countC+C_countD, C_interval.end, C_interval.begin)
                     C_countA = C_countA+1
                     C_interval = Interval(C_interval.begin, mC1)
                     
                 elif(next_symbol==3):
-                    mC1 = C_interval.begin + round(((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
-                    mC2 = C_interval.begin + round(((nA-C_countA + nB - C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    # mC1 = C_interval.begin + round(((nA-C_countA)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    # mC2 = C_interval.begin + round(((nA-C_countA + nB - C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    mC1 = integer_fraction(nA-C_countA, N, C_countA+C_countB+C_countC+C_countD, C_interval.end, C_interval.begin)
+                    mC2 = integer_fraction(nA-C_countA+nB-C_countB, N, C_countA+C_countB+C_countC+C_countD, C_interval.end, C_interval.begin)
                     C_countB = C_countB+1
                     C_interval = Interval(mC1,mC2)
 
                 elif(next_symbol==5):
-                    mC2 = C_interval.begin + round(((nA-C_countA + nB - C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
-                    mC3 = C_interval.begin + round(((nA-C_countA + nB - C_countB + nC - C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    # mC2 = C_interval.begin + round(((nA-C_countA + nB - C_countB)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    # mC3 = C_interval.begin + round(((nA-C_countA + nB - C_countB + nC - C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    mC2 = integer_fraction(nA-C_countA+nB-C_countB, N, C_countA+C_countB+C_countC+C_countD, C_interval.end, C_interval.begin)
+                    mC3 = integer_fraction(nA-C_countA+nB-C_countB+nC-C_countC, N, C_countA+C_countB+C_countC+C_countD, C_interval.end, C_interval.begin)
                     C_countC = C_countC+1
                     C_interval = Interval(mC2,mC3)
 
                 elif(next_symbol==7):
-                    mC3 = C_interval.begin + round(((nA-C_countA + nB - C_countB + nC - C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    # mC3 = C_interval.begin + round(((nA-C_countA + nB - C_countB + nC - C_countC)/(N-C_countA-C_countB-C_countC-C_countD))*(C_interval.end-C_interval.begin))
+                    mC3 = integer_fraction(nA-C_countA+nB-C_countB+nC-C_countC, N, C_countA+C_countB+C_countC+C_countD, C_interval.end, C_interval.begin)
                     C_countD = C_countD+1
                     C_interval = Interval(mC3,C_interval.end)
         
@@ -484,7 +514,7 @@ plot=True
 if(plot==True):
     Modbits = 4
     blocks = 1
-    # np.random.seed(3)
+    np.random.seed(3)
     
     if(Modbits==4):
         signal_points = [1,3]
@@ -511,8 +541,8 @@ if(plot==True):
         bits = np.random.randint(0, 2, size= k*blocks)
         # bits = np.ones(k)
 
-    p_encode = 60
-    p_decode = 60
+    p_encode = 55
+    p_decode = 55
 
     x = DM_encode(C,bits,k,blocks,p_encode)
 

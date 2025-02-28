@@ -8,7 +8,7 @@ import performance_evaluation as p
 from matplotlib.ticker import MaxNLocator
 from scipy.fft import fft, ifft, fftshift, ifftshift
 import PAS.PAS_architecture as pas
-import PAS.distribution_matcher
+import Python.source.PAS.PAS_old.distribution_matcher
 import PAS.ldpc_jossy
 from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D

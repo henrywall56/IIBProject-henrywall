@@ -28,112 +28,120 @@ def DM_encode(C, v, k,blocks):
         nC = C[2]
         nD = C[3]
         
-        wi = 1 #input interval width
-        bi = 0 #input interval base
+        ui = 1.0 #input interval upper
+        bi = 0.0 #input interval base
         h=0 #Number of symbols sent to output
-        bc = 0 #code interval base
-        wc = 1 #code interval width
+        bc = 0.0 #code interval base
+        uc = 1.0 #code interval upper
 
         for i in range(k):
             if(v[row][i] == 0):
                 bi = bi
-                wi = wi/2
+                ui = bi + (ui-bi)*0.5
 
             else:
-                bi = bi + wi/2
-                wi = wi/2
+                bi = bi + (ui-bi)/2
+                ui = ui
 
-            m1 = (nA/(N-h))*(wc)+bc
-            m2 = ((nA+nB)/(N-h))*(wc) + bc
-            m3 = ((nA+nB+nC)/(N-h))*(wc) + bc
+            m1 = (nA/(N-h))*(uc-bc)+bc
+            m2 = ((nA+nB)/(N-h))*(uc-bc) + bc
+            m3 = ((nA+nB+nC)/(N-h))*(uc-bc) + bc
 
             #Code interval is [bc,m) and [m,bc+wc)
         
-            if(bi+wi < m1 and bi > bc): #input interval identifies output A interval
+            if(bi > bc and ui < m1): #input interval identifies output A interval
                 x[row][h] = 1
-                wc = m1 - bc #upper is m1
+                uc = m1 #upper is m1
                 bc = bc #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = (bi-bc)/(uc-bc)
+                ui = (ui-bc)/(uc-bc)
+                if(ui>1):
+                    ui=1.0
+                bc = 0.0
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                uc = 1.0
                 nA = nA - 1 #one less symbol A left in bag
 
 
-            elif(bi > m1 and bi+wi<m2): #input interval identifies output B interval
+            elif(bi > m1 and ui<m2): #input interval identifies output B interval
                 x[row][h] = 3
-                wc = m2-m1 #upper is m2
+                uc = m2 #upper is m2
                 bc = m1 #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = (bi-bc)/(uc-bc)
+                ui = (ui-bc)/(uc-bc)
+                if(ui>1):
+                    ui=1.0
+                bc = 0.0
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                uc = 1.0
                 nB = nB - 1 #one less symbol B left in bag
 
-            elif(bi > m2 and bi+wi<m3): #input interval identifies output B interval
+            elif(bi > m2 and ui<m3): #input interval identifies output B interval
                 x[row][h] = 5
-                wc = m3-m2 #upper is m3
+                uc = m3 #upper is m3
                 bc = m2 #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = (bi-bc)/(uc-bc)
+                ui = (ui-bc)/(uc-bc)
+                if(ui>1):
+                    ui=1.0
+                bc = 0.0
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                uc = 1.0
                 nC = nC- 1 #one less symbol B left in bag
 
-            elif(bi > m3 and bi+wi<bc+wc): #input interval identifies output B interval
+            elif(bi > m3 and ui<uc): #input interval identifies output B interval
                 x[row][h] = 7
-                wc = bc+wc-m3 #upper is as before
+                #upper is as before
                 bc = m3 #lower
-                bi = (bi-bc)/(wc)
-                bc = 0
+                bi = (bi-bc)/(uc-bc)
+                ui = (ui-bc)/(uc-bc)
+                if(ui>1):
+                    ui=1.0
+                bc = 0.0
                 h=h+1 #one more output symbol sent to buffer (one less left in bag)
-                wi = wi / (wc)
-                wc = 1
+                uc = 1.0
                 nD= nD - 1 #one less symbol B left in bag
 
             # else:  #Check for lower level candidates and rescale ONLY FOR 16-QAM SO FAR
                 
-            #     u1 = bc+wc
+            #     u1 = uc
             #     l1 = bc
-            #     ui = bi + wi
             #     u2 = m1 + (nA/(N-h))*(u1-m1)
             #     l2 = m1 - (nB/(N-h))*(m1-l1)
 
             #     if((bi>=l2) and (ui<=u2)):
             #         print('else1')
             #         bi = (bi-l2)/(u2-l2)
-            #         wi = wi/(u2-l2)
-            #         # bc = l2
-            #         # wc = u2 - l2
+            #         ui = (ui-l2)/(u2-l2)
             #         bc = (bc-l2)/(u2-l2)
-            #         wc = wc/(u2-l2)
+            #         uc = (uc-l2)/(u2-l2)
 
             #     elif ((bi>=l1) and (ui<=u2)): 
             #         print('else2')
             #         bi = (bi-l1)/(u2-l1)
-            #         wi = wi/(u2-l1)
-            #         # bc = l1
-            #         # wc = u2 - l1
+            #         ui = (ui-l1)/(u2-l1)
             #         bc = (bc-l1)/(u2-l1)
-            #         wc = wc/(u2-l1)
+            #         uc = (uc-l1)/(u2-l1)
 
             #     elif((bi>=l2) and (ui<=u1)): 
             #         print('else3')
             #         bi = (bi-l2)/(u1-l2)
-            #         wi = wi/(u1-l2)
-            #         # bc = l2
-            #         # wc = u1 - l2
+            #         ui = (ui-l2)/(u1-l2)
             #         bc = (bc-l2)/(u1-l2)
-            #         wc = wc/(u1-l2)
+            #         uc = (uc-l2)/(u1-l2)
+
+            #     if(ui>1):
+            #         ui=1.0
+            #     if(uc>1):
+            #         print(uc)
+            #         uc=1.0
+                
 
 
         #Finalisation step so that the codeword identifies the source interval [bi, bi+wi)
-        m1 = (nA/(N-h))*(wc)+bc
-        m2 = ((nA+nB)/(N-h))*(wc)+bc
-        m3 = ((nA+nB+nC)/(N-h))*(wc)+bc
+        m1 = (nA/(N-h))*(uc-bc)+bc
+        m2 = ((nA+nB)/(N-h))*(uc-bc)+bc
+        m3 = ((nA+nB+nC)/(N-h))*(uc-bc)+bc
         #lower of code interval is 0
         #upper of code interval is 1
         #bi is base of source interval
@@ -150,12 +158,7 @@ def DM_encode(C, v, k,blocks):
         if(nC!=0):
             code_intervals.addi(m2, m3, [int(5)])
         if(nD!=0):
-            code_intervals.addi(m3, bc+wc, [int(7)])
-        i=0
-
-        print(bi)
-        print(bi+wi)
-        
+            code_intervals.addi(m3, uc, [int(7)])
         
         while(1):
             new_intervals = []
@@ -213,14 +216,14 @@ def DM_encode(C, v, k,blocks):
                 code_intervals.discard(iv)
 
             #find intervals that overlap with source interval
-            overlapping_intervals = code_intervals.overlap(bi, bi+wi)
+            overlapping_intervals = code_intervals.overlap(bi, ui)
                 
             epsilon_overlap = []
             epsilon = 0
             for interval in overlapping_intervals:
                 # Calculate the overlap size (intersection length)
                 overlap_start = max(interval.begin, bi)
-                overlap_end = min(interval.end, bi+wi)
+                overlap_end = min(interval.end, ui)
                 overlap_size = overlap_end - overlap_start
                 
                 # If the overlap size is less than epsilon, add to discard list
@@ -250,12 +253,11 @@ def DM_encode(C, v, k,blocks):
             #code_intervals contains only the overlapping intervals scaled from 0 to 1
             
             bi = (bi-l)/(u-l)
-            wi = wi/(u-l)
+            ui = (ui-l)/(u-l)
 
             e=0
-            print(wi,'w')
 
-            lower_border_inside = [iv for iv in code_intervals if iv.begin >= bi-e and iv.begin <= bi+wi+e]
+            lower_border_inside = [iv for iv in code_intervals if iv.begin >= bi-e and iv.begin <= ui+e]
 
             lower_border_sorted = sorted(lower_border_inside, key=lambda iv: iv.begin)
 
@@ -494,7 +496,6 @@ if(plot==True):
         N = np.sum(C)
         k = int(np.floor(math.log2(nCr(N,C[1]))))
         bits = np.random.randint(0, 2, size= k*blocks)
-        # bits = np.ones(k)
 
     if(Modbits==6):
         signal_points = [1,3,5,7]
@@ -513,7 +514,7 @@ if(plot==True):
 
 
     x = DM_encode(C,bits,k,blocks)
-    print(x)
+
     count1 = np.count_nonzero(x==1)
     count3 = np.count_nonzero(x==3)
     count5 = np.count_nonzero(x==5)

@@ -120,7 +120,7 @@ def moutofn_decoder(v, m, N, k , w):
                         
     return u.flatten()
 
-C = [500,300]
+C = [1500,500]
 
 
 N=np.sum(C)
@@ -128,13 +128,12 @@ m=C[1]
 print(m)
 print(N)
 
-w=8
+w=30
 blocks=1
 k=int(np.floor(math.log2(nCr(N,m)))) #There are nCr(N,m) codewords, so have maximum log2(number of codewords) input bits.
 
 np.random.seed(1)
 bits = np.random.randint(0, 2, size= k*blocks)
-bits = np.zeros(k)
 
 
 
