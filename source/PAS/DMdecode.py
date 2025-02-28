@@ -1,0 +1,201 @@
+import numpy as np
+from intervaltree import IntervalTree, Interval
+import math
+import matplotlib.pyplot as plt
+
+
+
+def DMdecode(codeword, C, k, blocks):
+    #Distributin Matcher Decoding Function
+    #C: the number of each symbol type in the codeword
+    #k: the number of information bits in each block
+    bits = []
+    nA = C[0]
+    nB = C[1]
+    nC = C[2]
+    nD = C[3]
+    symbol_counts = [nA,nB,nC,nD]
+
+    N = nA + nB +nC + nD
+
+    codeword = codeword.reshape((blocks,N))
+    
+
+    for row in range(blocks):
+        bit_row = []
+        symbol_counts = [nA,nB,nC,nD]
+        m1 = (symbol_counts[0]/(N))
+        m2 = ((symbol_counts[0]+symbol_counts[1])/(N))
+        m3 = ((symbol_counts[0]+symbol_counts[1]+symbol_counts[2])/(N))
+
+        C_intervals = IntervalTree()    #initialise candidate intervals
+        if(nA!=0):
+            C_intervals.addi(0.0,m1,int(1)) 
+        if(nB!=0):
+            C_intervals.addi(m1,m2,int(3))
+        if(nC!=0):
+            C_intervals.addi(m2,m3,int(5))
+        if(nD!=0):
+            C_intervals.addi(m3,1.0,int(7))
+
+        S_interval = Interval(0,1.0)   #intialise source interval
+
+        symbol_index = 0   #current symbol
+        row_done = False
+
+        while(symbol_index != N):
+            unprocessed_symbol = codeword[row][symbol_index] #Read code symbol
+
+            for iv in C_intervals:
+                if(unprocessed_symbol == iv.data):
+                    code_interval = Interval(iv.begin,iv.end)
+                    break
+            #         unprocessed_symbol = 0
+            # if(unprocessed_symbol != 0):
+            #     continue
+
+            symbol_counts_future = symbol_counts.copy()
+
+            if(unprocessed_symbol == 1):
+                symbol_counts_future[0] -= 1 #nA
+            elif(unprocessed_symbol == 3):
+                symbol_counts_future[1] -= 1 #nB
+            elif(unprocessed_symbol == 5):
+                symbol_counts_future[2] -= 1 #nC
+            elif(unprocessed_symbol == 7):
+                symbol_counts_future[3] -= 1 #nD
+
+            preview_symbol_index = symbol_index #Refine code interval until it identifies enough source symbols to imitate the behaviour of the decoder.
+            preview_symbol_index +=1            #If the encoder performs a scaling operation, reset the code interval to the state of the encoder and restart.
+            
+            scaled = False
+            
+            while(scaled==False):
+                s = S_interval.begin + (S_interval.end-S_interval.begin)*0.5 #source interval midpoint
+                while((code_interval.begin >= s) or (code_interval.end < s)): #code interval does not straddle border. If it is on one side, it will stay there.
+                    if(code_interval.begin >= s):
+                        bit_row.append(1)
+                        S_interval = Interval(s, S_interval.end)
+                    elif(code_interval.end < s):
+                        bit_row.append(0)
+                        S_interval = Interval(S_interval.begin, s)
+                    
+
+                    if(len(bit_row)==k):
+                        row_done = True
+                        break
+                
+                    s = S_interval.begin + (S_interval.end-S_interval.begin)*0.5
+
+                    S_interval_check = Interval(S_interval.begin,S_interval.end) #used to check if source interval has been rescaled
+                    symbol_counts_temp = symbol_counts.copy()
+
+        ###################   MIMICKING ENCODER OPERATION  ################## To check if there is a rescaling
+                    symbol_identified=False
+                    for iv in C_intervals:
+                        if(S_interval_check.begin >= iv.begin and S_interval_check.end <= iv.end):
+                            symbol_identified = True
+                            correct_code_interval = Interval(iv.begin,iv.end,iv.data)
+                            break 
+                    number_identified = 0
+                    while(symbol_identified==True):
+                        number_identified += 1 #number of symbols identified by this encoder. This is the number that the symbol_index will need to increase by to match state of the encoder.
+                        #rescale source interval
+                        bi = (S_interval_check.begin - correct_code_interval.begin)/(correct_code_interval.end-correct_code_interval.begin)
+                        ui = (S_interval_check.end - correct_code_interval.begin)/(correct_code_interval.end-correct_code_interval.begin)
+                        S_interval_check = Interval(bi,ui)
+                        if(ui>1):
+                            ui=1
+
+                        #Update code intervals
+                        latest_symbol = correct_code_interval.data
+
+                        if(latest_symbol==1):
+                            symbol_counts_temp[0] -=1
+                        elif(latest_symbol==3):
+                            symbol_counts_temp[1] -=1
+                        elif(latest_symbol==5):
+                            symbol_counts_temp[2] -=1
+                        elif(latest_symbol==7): 
+                            symbol_counts_temp[3] -=1
+
+                        bc = 0.0 #code interval base
+                        uc = 1.0 #code interval upper
+                        symbols_left = symbol_counts_temp[0] + symbol_counts_temp[1] + symbol_counts_temp[2] + symbol_counts_temp[3]
+                        m1 = (symbol_counts_temp[0]/(symbols_left))*(uc-bc)+bc
+                        m2 = ((symbol_counts_temp[0]+symbol_counts_temp[1])/(symbols_left))*(uc-bc) + bc
+                        m3 = ((symbol_counts_temp[0]+symbol_counts_temp[1]+symbol_counts_temp[2])/(symbols_left))*(uc-bc) + bc
+                        
+                        C_intervals.clear()
+                        if(symbol_counts_temp[0]!=0):
+                            C_intervals.addi(bc, m1, int(1))
+                        if(symbol_counts_temp[1]!=0):
+                            C_intervals.addi(m1, m2, int(3))
+                        if(symbol_counts_temp[2]!=0):
+                            C_intervals.addi(m2, m3, int(5))
+                        if(symbol_counts_temp[3]!=0):
+                            C_intervals.addi(m3, uc, int(7))   
+
+                        symbol_identified = False
+
+                        for iv in C_intervals:
+                            if((S_interval_check.begin >= iv.begin) and (S_interval_check.end <= iv.end)):
+                                symbol_identified = True
+                                correct_code_interval = Interval(iv.begin,iv.end,iv.data)
+                                break 
+        #################################################################
+                    
+                    if((S_interval_check.begin != S_interval.begin) or (S_interval_check.end != S_interval.end)):
+                        symbol_index += number_identified
+                        symbol_counts = symbol_counts_temp.copy()
+                        S_interval = Interval(S_interval_check.begin, S_interval_check.end)
+                        scaled = True
+                        break
+                
+                if(row_done==True):
+                    break
+                        
+                if(preview_symbol_index == N):
+                    code_interval = Interval(code_interval.begin, code_interval.begin + 0.01*(code_interval.end - code_interval.begin)) #"magic"
+
+                else: #Preview next symbol
+                    preview_symbol = codeword[row][preview_symbol_index]
+                    symbol_shortlist = []
+                    symbol_shortlist.append(preview_symbol)
+
+                    symbols_left = symbol_counts_future[0] + symbol_counts_future[1] + symbol_counts_future[2] + symbol_counts_future[3]
+                    if(preview_symbol==1):
+                        l=0
+                        u = symbol_counts_future[0]/symbols_left
+                    elif(preview_symbol==3):
+                        l = symbol_counts_future[0]/symbols_left
+                        u = (symbol_counts_future[0]+symbol_counts_future[1])/symbols_left
+                    elif(preview_symbol==5):
+                        l = (symbol_counts_future[0]+symbol_counts_future[1])/symbols_left
+                        u = (symbol_counts_future[0]+symbol_counts_future[1]+symbol_counts_future[2])/symbols_left
+                    elif(preview_symbol==7):
+                        l = (symbol_counts_future[0]+symbol_counts_future[1]+symbol_counts_future[2])/symbols_left
+                        u = 1.0
+
+                    buffer_l = code_interval.begin + (code_interval.end - code_interval.begin)*l
+                    buffer_u = code_interval.begin + (code_interval.end - code_interval.begin)*u
+                    code_interval = Interval(buffer_l,buffer_u)
+
+                    if(preview_symbol==1):
+                        symbol_counts_future[0] -=1
+                    elif(preview_symbol==3):
+                        symbol_counts_future[1] -=1
+                    elif(preview_symbol==5):
+                        symbol_counts_future[2] -=1
+                    elif(preview_symbol==7): 
+                        symbol_counts_future[3] -=1
+                    
+                    preview_symbol_index += 1
+                
+
+            if(row_done==True):
+                break
+
+        bits.append(bit_row)
+    return np.array(bits).flatten()
+ 
