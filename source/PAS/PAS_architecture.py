@@ -5,10 +5,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
 import math
 
-testing=True
+testing=False
 if(testing==False):
     import PAS.DMencode as DMencode
-    import PAS.DMencode as DMdecode
+    import PAS.DMdecode as DMdecode
     from PAS.ldpc_jossy.py import ldpc
     import sys
     import os
@@ -245,15 +245,15 @@ def regroup_LLRs(LLR, Modbits):
 def PAS_parameters(Modbits,λ):
     if(Modbits==4):
         signal_points = [1,3]
-        N_target = 49
+        N_target = 901
         const = 0
         for i in signal_points:
             const += np.exp(-λ*np.abs(i)**2)
         C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),0,0]
         N = np.sum(C)
         k = int(np.floor(math.log2(nCr(N,C[1]))))
-        LDPC_encoder = ldpc.code(standard = '802.16', rate = '1/2', z=4, ptype='A')
-        #LDPC_encoder.K should be (m-1)N
+        LDPC_encoder = ldpc.code(standard = '802.16', rate = '1/2', z=75, ptype='A')
+        #LDPC_encoder.K should be (m-1)N = N
 
     elif(Modbits==6):
         signal_points = [1,3,5,7]
@@ -265,10 +265,9 @@ def PAS_parameters(Modbits,λ):
         C[0] += 1 #to get N to 400
         k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])))))
         N = np.sum(C)
-        print(N)
         LDPC_encoder = ldpc.code(standard = '802.16', rate = '2/3', z=50, ptype='A')
-        print(LDPC_encoder.K)
-        #LDPC_encoder.K should be (m-1)N
+        
+        #LDPC_encoder.K should be (m-1)N = 2N
 
     return k, N, C, LDPC_encoder
 
@@ -328,7 +327,7 @@ def PAS_barplot(X):
     ax = fig.add_subplot(111, projection='3d')
 
     # Define bar width
-    bar_width = 0.1
+    bar_width = 0.3
 
     # Plot bars with color-coding
     for x, y, h, color in zip(real_parts, imag_parts, probabilities, colors):
@@ -384,7 +383,6 @@ if(testing==True):
         print('Bit Errors')
     print(list(np.where(bits!=bits_decoded)))
 
-    print('SER:', np.sum(Y_decoded!=X*np.sqrt(norm))/X.size)
     print('BER:', np.sum(bits!=bits_decoded)/bits.size)
 
     PAS_barplot(X)
