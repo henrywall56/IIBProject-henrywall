@@ -19,7 +19,6 @@ def DMdecode(codeword, C, k, blocks):
     N = nA + nB +nC + nD
 
     codeword = codeword.reshape((blocks,N))
-    
 
     for row in range(blocks):
         bit_row = []
@@ -28,7 +27,8 @@ def DMdecode(codeword, C, k, blocks):
         m2 = ((symbol_counts[0]+symbol_counts[1])/(N))
         m3 = ((symbol_counts[0]+symbol_counts[1]+symbol_counts[2])/(N))
 
-        C_intervals = IntervalTree()    #initialise candidate intervals
+        ########## INITIALISE ##########
+        C_intervals = IntervalTree()    
         if(nA!=0):
             C_intervals.addi(0.0,m1,int(1)) 
         if(nB!=0):
@@ -44,33 +44,32 @@ def DMdecode(codeword, C, k, blocks):
         row_done = False
 
         while(symbol_index != N):
-            unprocessed_symbol = codeword[row][symbol_index] #Read code symbol
+            ######### READ CODE SYMBOL #########
+            unprocessed_symbol = codeword[row][symbol_index] 
 
-            for iv in C_intervals:
+            for iv in C_intervals: #Choose interval corresponding to symbol
                 if(unprocessed_symbol == iv.data):
                     code_interval = Interval(iv.begin,iv.end)
                     break
-            #         unprocessed_symbol = 0
-            # if(unprocessed_symbol != 0):
-            #     continue
 
-            symbol_counts_future = symbol_counts.copy()
+            symbol_counts_preview = symbol_counts.copy() #Used later in preview stage
 
-            if(unprocessed_symbol == 1):
-                symbol_counts_future[0] -= 1 #nA
+            if(unprocessed_symbol == 1):    #Keep preview up to date with current state at this stage
+                symbol_counts_preview[0] -= 1 #nA 
             elif(unprocessed_symbol == 3):
-                symbol_counts_future[1] -= 1 #nB
+                symbol_counts_preview[1] -= 1 #nB
             elif(unprocessed_symbol == 5):
-                symbol_counts_future[2] -= 1 #nC
+                symbol_counts_preview[2] -= 1 #nC
             elif(unprocessed_symbol == 7):
-                symbol_counts_future[3] -= 1 #nD
+                symbol_counts_preview[3] -= 1 #nD
 
             preview_symbol_index = symbol_index #Refine code interval until it identifies enough source symbols to imitate the behaviour of the decoder.
             preview_symbol_index +=1            #If the encoder performs a scaling operation, reset the code interval to the state of the encoder and restart.
             
-            scaled = False
+            scaled = False 
             
             while(scaled==False):
+            ######## IDENTIFY SOURCE SYMBOLS ########
                 s = S_interval.begin + (S_interval.end-S_interval.begin)*0.5 #source interval midpoint
                 while((code_interval.begin >= s) or (code_interval.end < s)): #code interval does not straddle border. If it is on one side, it will stay there.
                     if(code_interval.begin >= s):
@@ -79,7 +78,6 @@ def DMdecode(codeword, C, k, blocks):
                     elif(code_interval.end < s):
                         bit_row.append(0)
                         S_interval = Interval(S_interval.begin, s)
-                    
 
                     if(len(bit_row)==k):
                         row_done = True
@@ -90,7 +88,7 @@ def DMdecode(codeword, C, k, blocks):
                     S_interval_check = Interval(S_interval.begin,S_interval.end) #used to check if source interval has been rescaled
                     symbol_counts_temp = symbol_counts.copy()
 
-        ###################   MIMICKING ENCODER OPERATION  ################## To check if there is a rescaling
+                    ##########   MIMICKING ENCODER OPERATION  ######### To check if there is a rescaling
                     symbol_identified=False
                     for iv in C_intervals:
                         if(S_interval_check.begin >= iv.begin and S_interval_check.end <= iv.end):
@@ -143,8 +141,8 @@ def DMdecode(codeword, C, k, blocks):
                                 symbol_identified = True
                                 correct_code_interval = Interval(iv.begin,iv.end,iv.data)
                                 break 
-        #################################################################
-                    
+                #######################################################
+                    ###### CHECK IF SCALING PERFORMED ###### If scaling if performed, update the symbol counter to the state of the encoder
                     if((S_interval_check.begin != S_interval.begin) or (S_interval_check.end != S_interval.end)):
                         symbol_index += number_identified
                         symbol_counts = symbol_counts_temp.copy()
@@ -154,6 +152,7 @@ def DMdecode(codeword, C, k, blocks):
                 
                 if(row_done==True):
                     break
+                ######### No Scaling Performed: PREVIEW CODE SYMBOL #########
                         
                 if(preview_symbol_index == N):
                     code_interval = Interval(code_interval.begin, code_interval.begin + 0.01*(code_interval.end - code_interval.begin)) #"magic"
@@ -163,18 +162,18 @@ def DMdecode(codeword, C, k, blocks):
                     symbol_shortlist = []
                     symbol_shortlist.append(preview_symbol)
 
-                    symbols_left = symbol_counts_future[0] + symbol_counts_future[1] + symbol_counts_future[2] + symbol_counts_future[3]
+                    symbols_left = symbol_counts_preview[0] + symbol_counts_preview[1] + symbol_counts_preview[2] + symbol_counts_preview[3]
                     if(preview_symbol==1):
                         l=0
-                        u = symbol_counts_future[0]/symbols_left
+                        u = symbol_counts_preview[0]/symbols_left
                     elif(preview_symbol==3):
-                        l = symbol_counts_future[0]/symbols_left
-                        u = (symbol_counts_future[0]+symbol_counts_future[1])/symbols_left
+                        l = symbol_counts_preview[0]/symbols_left
+                        u = (symbol_counts_preview[0]+symbol_counts_preview[1])/symbols_left
                     elif(preview_symbol==5):
-                        l = (symbol_counts_future[0]+symbol_counts_future[1])/symbols_left
-                        u = (symbol_counts_future[0]+symbol_counts_future[1]+symbol_counts_future[2])/symbols_left
+                        l = (symbol_counts_preview[0]+symbol_counts_preview[1])/symbols_left
+                        u = (symbol_counts_preview[0]+symbol_counts_preview[1]+symbol_counts_preview[2])/symbols_left
                     elif(preview_symbol==7):
-                        l = (symbol_counts_future[0]+symbol_counts_future[1]+symbol_counts_future[2])/symbols_left
+                        l = (symbol_counts_preview[0]+symbol_counts_preview[1]+symbol_counts_preview[2])/symbols_left
                         u = 1.0
 
                     buffer_l = code_interval.begin + (code_interval.end - code_interval.begin)*l
@@ -182,15 +181,17 @@ def DMdecode(codeword, C, k, blocks):
                     code_interval = Interval(buffer_l,buffer_u)
 
                     if(preview_symbol==1):
-                        symbol_counts_future[0] -=1
+                        symbol_counts_preview[0] -=1
                     elif(preview_symbol==3):
-                        symbol_counts_future[1] -=1
+                        symbol_counts_preview[1] -=1
                     elif(preview_symbol==5):
-                        symbol_counts_future[2] -=1
+                        symbol_counts_preview[2] -=1
                     elif(preview_symbol==7): 
-                        symbol_counts_future[3] -=1
+                        symbol_counts_preview[3] -=1
                     
                     preview_symbol_index += 1
+
+                    # Go back to identifying source symbols, as still in "no scaling performed" loop.
                 
 
             if(row_done==True):

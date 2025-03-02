@@ -366,14 +366,12 @@ def add_noise(signal, snrb_db, sps, Modbits, NPol, toggle_AWGNnoise):
     if(toggle_AWGNnoise==True):
         if(NPol==1):
             snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
-
             stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*snr))
             noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
 
             return signal + noise, stdev
         elif(NPol==2):
             snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
-
             stdev0= np.sqrt(np.mean(abs(signal[0])**2)*sps/(2*snr))
             stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*snr))
             noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))

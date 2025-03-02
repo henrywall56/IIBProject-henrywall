@@ -8,7 +8,8 @@ import performance_evaluation as p
 from matplotlib.ticker import MaxNLocator
 from scipy.fft import fft, ifft, fftshift, ifftshift
 import PAS.PAS_architecture as pas
-import Python.source.PAS.PAS_old.distribution_matcher
+import PAS.DMencode
+import PAS.DMdecode
 import PAS.ldpc_jossy
 from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
@@ -32,6 +33,7 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 
 """
 def main():
+    
     num_power = 16
     num_symbols = 2**num_power #Number of symbols in each polarisation
                                #Overwritten if PAS used
@@ -87,7 +89,7 @@ def main():
     
     #NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
-    snr_begin = 30
+    snr_begin = 15
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
@@ -105,7 +107,8 @@ def main():
     toggle_adaptive_equalisation = False
     AIR_type = 'MI' #'MI' or 'GMI'
     toggle_PAS = True
-    
+
+
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
 
@@ -149,7 +152,6 @@ def main():
         else:
             num_symbols = symbols.shape[1]
         
-        
         print('PAS Parameters:')
         print('Info Bits per Block k-N:         ', kpas)
         print('Symbols per Block N:           ', Npas)
@@ -161,8 +163,6 @@ def main():
         print('Symbol Rate:         ', Rs/1e9, 'GBaud')
         print('Bit Rate:            ', 2*((kpas)/Npas)*Rs/1e9, 'GBit/s')
         print('--------------------------------------')
-
-
         
     RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
@@ -208,16 +208,16 @@ def main():
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
     laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
     Laser_Eoutput = Laser_Eoutput/np.sqrt(laser_norm) #normal
-
+    
     for i, snr_dbi in enumerate(snr_db):
+        if(snr_dbi!=21):
+            continue
         
         print(f'Processing SNR {snr_dbi}')
         
         Gaussian_noise_signal, sigma = f.add_noise(Laser_Eoutput, snr_dbi, sps, Modbits, NPol, toggle_AWGNnoise) 
-        print('-------',sigma)
         
         if(toggle_NL==False):
-            
             CD_NL_signal = f.add_chromatic_dispersion(Gaussian_noise_signal, sps, Rs, D, Clambda, L, NPol, toggle_CD)
     
         else:   
@@ -282,7 +282,7 @@ def main():
             #Note DD algorithm currently only set up for NPol==1
             #Note this currently uses SNR per bit, which should be changed to per symbol
             Phase_Noise_compensated_rx, thetaHat = dd.DD_phase_noise_compensation(downsampled_rx, sps, Rs, Linewidth, Modbits, snr_dbi, frac, toggle_phasenoisecompensation)
-
+        
         if(toggle_PAS==True):
             if(NPol==1):
 

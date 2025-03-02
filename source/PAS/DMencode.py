@@ -2,7 +2,7 @@ import numpy as np
 from intervaltree import IntervalTree, Interval
 import math
 import matplotlib.pyplot as plt
-import DMdecode as DMdecode
+
 #My implementation of distribution matcher
     
 def nCr(n, r):
@@ -187,6 +187,7 @@ def DMencode(C, v, k,blocks):
 plot=False
 
 if(plot==True):
+    import DMdecode as DMdecode
     Modbits = 6
     blocks = 1
     # np.random.seed(1)
