@@ -2,6 +2,8 @@ import numpy as np
 import functions as f
 from scipy.optimize import minimize_scalar
 import matplotlib.pyplot as plt
+import parameters as p
+from matplotlib.ticker import MaxNLocator
 
 def LLR(y,x,bmap,sigma2, Modbits):
     #Not for use with differential encoding
@@ -381,4 +383,65 @@ def AIR_SDSW(x,y,Modbits):
     
     return AIR
 
-    
+def performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols):
+    if(p.Mod_param.NPol==1):
+        BER = np.mean(original_bits != demodulated_bits)
+        if(p.toggle.toggle_AIR==True):
+            if(p.toggle.toggle_PAS==False):
+                if(p.toggle.AIR_type=='GMI'):
+                    AIR = AIR_SDBW(source_symbols, original_bits, processed_symbols, p.Mod_param.Modbits)
+                elif(p.toggle.AIR_type=='MI'):
+                    AIR = AIR_SDSW(source_symbols, processed_symbols, p.Mod_param.Modbits)
+            else:
+                AIR = 0 #undefined yet
+        else:
+            AIR = 0
+            
+    elif(p.Mod_param.NPol==2):
+        BER = (np.sum(original_bits[0] != demodulated_bits[0])+np.sum(original_bits[1] != demodulated_bits[1]))/(2*original_bits.shape[1])
+        if(p.toggle.toggle_AIR==True):
+            if(p.toggle.toggle_PAS==False):
+                if(p.toggle.AIR_type=='GMI'):
+                    AIR = 0.5*(AIR_SDBW(source_symbols[0], original_bits[0],processed_symbols[0], p.Mod_param.Modbits) + AIR_SDBW(source_symbols[1], original_bits[1], processed_symbols[1], p.Mod_param.Modbits))
+                elif(p.toggle.AIR_type=='MI'):
+                    AIR = 0.5*(AIR_SDSW(source_symbols[0], processed_symbols[0], p.Mod_param.Modbits)+AIR_SDSW(source_symbols[1], processed_symbols[1], p.Mod_param.Modbits))
+            else:
+                AIR = 0 #undefined yet
+        else:
+            AIR = 0
+
+
+    if(p.toggle.toggle_AIR==True):
+        #Shannon limit 
+        snr_db = p.fibre_param.snr_db
+        snr_dbarr = np.array([snr_db-3, snr_db-2, snr_db-1, snr_db, snr_db+1, snr_db+2, snr_db+3])
+        snr_dbLinarr = 10**(snr_dbarr/10)
+        shannon = np.log2(1+snr_dbLinarr)
+        if(p.toggle.AIR_type == 'GMI'):
+            AIR_theoretical = AIR_SDBW_theoretical(snr_dbarr, p.Mod_param.Modbits)
+            plt.figure()
+            M = int(2**p.Mod_param.Modbits)
+            plt.title(f"SD-BW AIRs with {M}-QAM")
+            plt.xlabel("SNR (dB)")
+            plt.ylabel("GMI (bits/symbols)")
+            plt.plot(p.fibre_param.snr_db, AIR, marker='o', color='b', label='Emprirical AIR')
+            plt.plot(snr_dbarr, AIR_theoretical, marker='x', color='r', label='Theoretical AIR')
+            plt.plot(snr_dbarr, shannon, color='g', label='Shannon Limit')
+            plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+            plt.legend(loc='lower left')
+            plt.ylim(0, max(AIR_theoretical[-1],AIR)+0.5)
+        elif(p.toggle.AIR_type=='MI'):
+            AIR_theoretical = AIR_SDSW_theoretical(snr_dbarr, p.Mod_param.Modbits)
+            plt.figure()
+            M = int(2**p.Mod_param.Modbits)
+            plt.title(f"SD-SW AIRs with {M}-QAM")
+            plt.xlabel("SNR (dB)")
+            plt.ylabel("MI (bits/symbols)")
+            plt.plot(p.fibre_param.snr_db, AIR, marker='o', color='b', label='Emprirical AIR')
+            plt.plot(snr_dbarr, AIR_theoretical, marker='x', color='r', label='Theoretical AIR')
+            plt.plot(snr_dbarr, shannon, color='g', label='Shannon Limit')
+            plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+            plt.legend(loc='lower left')
+            plt.ylim(min(min(AIR_theoretical)-2, AIR), max(AIR_theoretical[-1],AIR)+2)
+
+    return BER, AIR, AIR_theoretical

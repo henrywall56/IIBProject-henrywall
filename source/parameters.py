@@ -10,11 +10,11 @@ class RRC_paramX:
         self.RRCimpulse , t1 = f.RRC(span, rolloff, sps)
 
 class fibre_paramX:
-    def __init__(self, L, D, Clambda, snrb_db):
+    def __init__(self, L, D, Clambda, snr_db):
         self.L = L #in m
         self.D = D #in ps/(nm.km)
         self.Clambda = Clambda #in m
-        self.snrb_db = snrb_db
+        self.snr_db = snr_db
 
 class IQ_Mod_paramX:
     def __init__(self, Vpi):
@@ -28,6 +28,7 @@ class laser_paramX:
         self.Linewidth=Linewidth #Hz
         self.maxDvT=maxDvT
         self.laser_power=laser_power
+        self.theta = 0
 
 class toggleX:
     def __init__(self, toggle_RRC, toggle_AWGNnoise, toggle_phasenoise, toggle_phasenoisecompensation, toggle_plotuncompensatedphase, toggle_ploterrorindexes, toggle_BPS, toggle_DE, toggle_frequencyrecovery, toggle_CD, toggle_NL, toggle_CD_compensation, toggle_AIR, toggle_adaptive_equalisation, toggle_PAS, AIR_type):
@@ -72,7 +73,7 @@ class AE_paramX:
         self.mu = mu
         self.N1 = N1
         self.N2 = N2
-        self.Ndisard = Ndiscard
+        self.Ndiscard = Ndiscard
 
 class BPS_paramX:
     def __init__(self, B, N):
@@ -91,8 +92,8 @@ class PAS_paramX:
 
 Mod_param = Modulation_paramX(
         Modbits = 6,
-        Rs = 100e9,
-        NPol = 1,
+        Rs = 200e9,
+        NPol = 2,
         num_power = 16
 )
 
@@ -106,7 +107,7 @@ fibre_param = fibre_paramX(
         L=1000*1e3, 
         D=17, 
         Clambda=1550/1e9,
-        snrb_db = 21
+        snr_db = 23 #per symbol
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
@@ -119,8 +120,8 @@ Linewidth = 100*10**3
 toggle = toggleX(
         toggle_RRC = True,
         toggle_AWGNnoise = True,
-        toggle_phasenoise = False,
-        toggle_phasenoisecompensation = False,
+        toggle_phasenoise = True,
+        toggle_phasenoisecompensation = True,
         toggle_plotuncompensatedphase = False,
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
@@ -129,7 +130,7 @@ toggle = toggleX(
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
-        toggle_AIR = False,
+        toggle_AIR = True,
         toggle_adaptive_equalisation = False,
         toggle_PAS = True,
         AIR_type = 'MI'

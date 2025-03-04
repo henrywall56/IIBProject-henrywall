@@ -3,8 +3,6 @@ from intervaltree import IntervalTree, Interval
 import math
 import matplotlib.pyplot as plt
 
-
-
 def DMdecode(codeword, C, k, blocks):
     #Distributin Matcher Decoding Function
     #C: the number of each symbol type in the codeword
