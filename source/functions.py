@@ -358,25 +358,25 @@ def pulseshaping(symbols, sps, RRCimpulse, NPol, toggle):
         return symbols
 
 @benchmark(enable_benchmark)
-def add_noise(signal, snrb_db, sps, Modbits, NPol, toggle_AWGNnoise): 
+def add_noise(signal, snr_db, sps, Modbits, NPol, toggle_AWGNnoise): #SNR PER SYMBOL
     #addition of circular Gaussian noise to transmitted signal
-    #snrb_db snr per symbol in dB in transmitted signal
-    #Modbits per symbol eg 16QAM or 64QAM etc.
+    #snrb_db snr per symbol in dB in transmitted signal. 
+    #Modbits per symbol eg 16QAM or 64QAM etc. 
     #sps samples per symbol
     if(toggle_AWGNnoise==True):
         if(NPol==1):
-            snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
+            snr = 10 ** (snr_db / 10) #dB to linear (10 since power)
             stdev= np.sqrt(np.mean(abs(signal)**2)*sps/(2*snr))
             noise = stdev * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
 
             return signal + noise, stdev
         elif(NPol==2):
-            snr = 10 ** (snrb_db / 10) #dB to linear (10 since power)
+            snr = 10 ** (snr_db / 10) #dB to linear (10 since power)
             stdev0= np.sqrt(np.mean(abs(signal[0])**2)*sps/(2*snr))
             stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*snr))
             noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))
             noise1 = stdev1 * (np.random.randn(len(signal[1])) + 1j * np.random.randn(len(signal[1])))
-
+            
             return np.array([signal[0]+noise0, signal[1]+noise1], dtype=complex), 0.5*(stdev0+stdev1)
 
     else:

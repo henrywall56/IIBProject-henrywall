@@ -8,11 +8,11 @@ import parameters as p
 def rx(rx):
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
-
+    
     filtered_signal = f.matched_filter(rx, p.RRC_param.RRCimpulse, NPol, toggle=p.toggle.toggle_RRC) #if toggle is False, this function returns input
-        
+    
     ADC = f.downsample(filtered_signal, p.RRC_param.sps//2, NPol, toggle=p.toggle.toggle_RRC) #Simulate ADC downsampling to 2 sps
-
+    
     #Chromatic Dispersion Compensation
     if(p.toggle.toggle_RRC==True):
         spsCD = 2
@@ -40,6 +40,15 @@ def rx(rx):
         downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:p.AE_param.Ndiscard], adaptive_eq_rx[:, p.AE_param.Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
 
         #downsampling done within adaptive equalisation
+        figAE, axsAE = plt.subplots(1,1, figsize=(8,8))
+        axsAE.plot(abs(adaptive_eq_rx[0]), linestyle='', marker='o', markersize='1', color='b', label='y1 mag.')
+        axsAE.set_ylabel('magnitude of symbols')
+        axsAE.plot(abs(adaptive_eq_rx[1]), linestyle='', marker='o', markersize='1', color='r', label='y2 mag.')
+        axsAE.set_ylim(0,3)
+        axsAE.vlines(p.AE_param.N1, colors='purple', label='N1', ymin=0, ymax=3)
+        axsAE.vlines(p.AE_param.N2, colors='green', label='N2', ymin=0, ymax=3)
+        axsAE.vlines(p.AE_param.Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
+        axsAE.legend()
 
     else:
         adaptive_eq_rx = CD_compensated_rx
@@ -56,14 +65,35 @@ def rx(rx):
         Phase_Noise_compensated_rx, thetaHat = f.BPS(frequency_recovered, Modbits, p.BPS_param.N, p.BPS_param.B, NPol, p.toggle.toggle_phasenoisecompensation)
     else:
         #Note DD algorithm currently only set up for NPol==1
-        #Note this currently uses SNR per bit, which should be changed to per symbol
+        #Note this DD algorithm currently uses SNR per bit, which should be changed to per symbol
         frac = 0.05
-        Phase_Noise_compensated_rx, thetaHat = dd.DD_phase_noise_compensation(downsampled_rx, p.RRC_param.sps, p.Mod_param.Rs, p.laser_param.Linewidth, Modbits, p.Mod_param.snrb_db, frac, p.toggle.toggle_phasenoisecompensation)
+        Phase_Noise_compensated_rx, thetaHat = dd.DD_phase_noise_compensation(downsampled_rx, p.RRC_param.sps, p.Mod_param.Rs, p.laser_param.Linewidth, Modbits, p.Mod_param.snr_db, frac, p.toggle.toggle_phasenoisecompensation)
     
+    if(p.toggle.toggle_phasenoisecompensation==True):
+        figPhase, axsPhase = plt.subplots(1,1, figsize=(8,8))
+        axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), p.laser_param.theta[0::p.RRC_param.sps], label='Phase')
+        #Note plotting theta before frequency recovery here
+        axsPhase.set_title(f'Phase Noise at SNR = {p.fibre_param.snr_db}dB \n ∆νT = {p.laser_param.maxDvT}')
+        axsPhase.grid(True)
+        axsPhase.set_xlabel('Time (ns)')
+        axsPhase.set_ylabel('Phase (rad)')
+
+        if(NPol==1):
+            axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), thetaHat, color='red', label='Phase Estimate')
+        elif(NPol==2):
+            axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), thetaHat[:,0], color='red', label='Phase Estimate (V)')
+            axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), thetaHat[:,1], color='orange', label='Phase Estimate (H)')
+        axsPhase.legend(loc='lower left')
+
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):
             demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
-
+            
+        elif(NPol==2):
+            demod_symbols0, demod_bits0 = pas.PAS_decoder(Phase_Noise_compensated_rx[0], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            demod_symbols1, demod_bits1 = pas.PAS_decoder(Phase_Noise_compensated_rx[1], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            demod_bits = np.array([demod_bits0,demod_bits1])
+            demod_symbols = np.array([demod_symbols0,demod_symbols1])
 
     elif(p.toggle.toggle_DE==True):
         if(NPol==1):
@@ -71,7 +101,7 @@ def rx(rx):
         if(NPol==2):
             demod_bits0 = f.Differential_decode_symbols(Phase_Noise_compensated_rx[0], Modbits)
             demod_bits1 = f.Differential_decode_symbols(Phase_Noise_compensated_rx[1], Modbits)
-            demod_bits = np.array([demod_bits0, demod_bits1])
+            demod_bits = np.array([demod_bits0, demod_bits1]).flatten()
     else:
         if(NPol==1):
             demod_symbols = f.max_likelihood_decision(Phase_Noise_compensated_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
@@ -84,4 +114,4 @@ def rx(rx):
             # Find erroneous symbol indexes
             demod_bits = f.decode_symbols(demod_symbols, Modbits, NPol) #pass in Modbits which says 16QAM or 64QAM
     
-    return demod_bits, demod_symbols, Phase_Noise_compensated_rx
+    return demod_bits, Phase_Noise_compensated_rx, demod_symbols

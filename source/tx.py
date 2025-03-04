@@ -60,11 +60,27 @@ def tx(original_bits):
         
         λpas = p.PAS_param.λ
         kpas, Npas, Cpas, LDPC_encoderpas = p.PAS_param.k, p.PAS_param.N, p.PAS_param.C, p.PAS_param.LDPC_encoder
-        symbols = pas.PAS_encoder(Cpas, original_bits, kpas, p.PAS_param.blocks, Modbits, LDPC_encoderpas)
-        pas.PAS_barplot(symbols)
-        PAS_normalisation = np.sum(abs(symbols)**2)/len(symbols)
-        p.PAS_param.PAS_normalisation = PAS_normalisation
-        symbols = symbols/np.sqrt(PAS_normalisation)
+        
+        if(NPol==1):
+            PAS_symbols = pas.PAS_encoder(Cpas, original_bits, kpas, p.PAS_param.blocks, Modbits, LDPC_encoderpas)
+            pas.PAS_barplot(PAS_symbols)
+            PAS_normalisation = np.sum(abs(PAS_symbols)**2)/len(PAS_symbols)
+            p.PAS_param.PAS_normalisation = PAS_normalisation
+            symbols = PAS_symbols/np.sqrt(PAS_normalisation)
+            
+        else:
+            PAS_symbols0 = pas.PAS_encoder(Cpas, original_bits[0], kpas, p.PAS_param.blocks, Modbits, LDPC_encoderpas)
+            pas.PAS_barplot(PAS_symbols0)
+            PAS_symbols1 = pas.PAS_encoder(Cpas, original_bits[1], kpas, p.PAS_param.blocks, Modbits, LDPC_encoderpas)
+            pas.PAS_barplot(PAS_symbols1)
+            PAS_normalisation0 = np.sum(abs(PAS_symbols0)**2)/(len(PAS_symbols0)+len(PAS_symbols1)) 
+            PAS_normalisation1 = np.sum(abs(PAS_symbols1)**2)/(len(PAS_symbols0)+len(PAS_symbols1)) 
+            PAS_normalisation = PAS_normalisation0 + PAS_normalisation1
+            p.PAS_param.PAS_normalisation = PAS_normalisation
+            symbols0 = PAS_symbols0/(np.sqrt(PAS_normalisation))
+            symbols1 = PAS_symbols1/(np.sqrt(PAS_normalisation)) 
+            symbols = np.array([symbols0,symbols1]) #normalised to unit energy (across both polarisations)
+
         if(NPol==1):
             p.Mod_param.num_symbols = len(symbols)
         else:
@@ -91,5 +107,5 @@ def tx(original_bits):
     print('RRC span: ', span)
     print('--------------------------------------')
     
-    return pulse_shaped_symbols
+    return pulse_shaped_symbols, symbols
 

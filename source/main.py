@@ -39,7 +39,7 @@ def main():
                                #Overwritten if PAS used
     Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
-    NPol = 1 #Number of polarisations used
+    NPol = 2 #Number of polarisations used
     
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
@@ -93,8 +93,8 @@ def main():
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
-    toggle_phasenoise = False #toggle phase noise
-    toggle_phasenoisecompensation = False #toggle phase noise compensation
+    toggle_phasenoise = True #toggle phase noise
+    toggle_phasenoisecompensation = True #toggle phase noise compensation
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = False #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
@@ -104,10 +104,9 @@ def main():
     toggle_NL = False
     toggle_CD_compensation = False #Toggle Chromatic Dispersion Compensation
     toggle_AIR = True
-    toggle_adaptive_equalisation = False
+    toggle_adaptive_equalisation = True
     AIR_type = 'MI' #'MI' or 'GMI'
     toggle_PAS = True
-
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -141,17 +140,32 @@ def main():
         λpas = 0.05
         kpas, Npas, Cpas, LDPC_encoderpas = pas.PAS_parameters(Modbits, λpas)
         blockspas = num_symbols//kpas #so approach roughly num_symbols
-        original_bits = np.random.randint(0, 2, size= kpas*blockspas*2*NPol)
-        symbols = pas.PAS_encoder(Cpas, original_bits, kpas, blockspas, Modbits, LDPC_encoderpas)
-        pas.PAS_barplot(symbols)
-        PAS_normalisation = np.sum(abs(symbols)**2)/len(symbols)
-        symbols = symbols/np.sqrt(PAS_normalisation)
-
+        if(NPol==1):
+            original_bits = np.random.randint(0, 2, size= kpas*blockspas*2*NPol)
+            PAS_symbols = pas.PAS_encoder(Cpas, original_bits, kpas, blockspas, Modbits, LDPC_encoderpas)
+            pas.PAS_barplot(PAS_symbols)
+            PAS_normalisation = np.sum(abs(PAS_symbols)**2)/len(PAS_symbols)
+            symbols = PAS_symbols/np.sqrt(PAS_normalisation)
+            
+        else:
+            original_bits = np.random.randint(0, 2, size= kpas*blockspas*2*NPol)
+            original_bits = original_bits.reshape(2,len(original_bits)//2)
+            PAS_symbols0 = pas.PAS_encoder(Cpas, original_bits[0], kpas, blockspas, Modbits, LDPC_encoderpas)
+            pas.PAS_barplot(PAS_symbols0)
+            PAS_symbols1 = pas.PAS_encoder(Cpas, original_bits[1], kpas, blockspas, Modbits, LDPC_encoderpas)
+            pas.PAS_barplot(PAS_symbols1)
+            PAS_normalisation0 = np.sum(abs(PAS_symbols0)**2)/(len(PAS_symbols0)+len(PAS_symbols1)) 
+            PAS_normalisation1 = np.sum(abs(PAS_symbols1)**2)/(len(PAS_symbols0)+len(PAS_symbols1)) 
+            PAS_normalisation = PAS_normalisation0 + PAS_normalisation1
+            symbols0 = PAS_symbols0/(np.sqrt(PAS_normalisation))
+            symbols1 = PAS_symbols1/(np.sqrt(PAS_normalisation)) 
+            symbols = np.array([symbols0,symbols1]) #normalised to unit energy (across both polarisations)
+            
         if(NPol==1):
             num_symbols = len(symbols)
         else:
             num_symbols = symbols.shape[1]
-        
+
         print('PAS Parameters:')
         print('Info Bits per Block k-N:         ', kpas)
         print('Symbols per Block N:           ', Npas)
@@ -191,7 +205,7 @@ def main():
             axs3H= axs3H.flatten()  # Flatten the array for easy indexing
 
     fig4, axs4 = plt.subplots(2, 2, figsize=(8, 8))  #Phase noise plot
-    axs4= axs4.flatten()  # Flatten the array for easy indexing
+    axs4 = axs4.flatten()  # Flatten the array for easy indexing
 
     if(toggle_adaptive_equalisation and NPol==2):
             fig5, axs5 = plt.subplots(2, 2, figsize=(8, 8))  #Adaptive equalisation magnitude plots
@@ -206,7 +220,10 @@ def main():
     Elaser, theta = f.Laser(laser_power, Linewidth, sps, Rs, num_symbols, NPol, toggle_phasenoise) #Laser phase noise
 
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
-    laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
+    if(NPol==1):
+        laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
+    else:
+        laser_norm = np.sum(abs(Laser_Eoutput)**2)/(2*Laser_Eoutput.shape[1])
     Laser_Eoutput = Laser_Eoutput/np.sqrt(laser_norm) #normal
     
     for i, snr_dbi in enumerate(snr_db):
@@ -285,12 +302,17 @@ def main():
         
         if(toggle_PAS==True):
             if(NPol==1):
-
                 demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, λpas, sigma, blockspas, LDPC_encoderpas, kpas, Cpas, PAS_normalisation)
-                erroneous_indexes = np.where(np.abs(symbols*np.sqrt(PAS_normalisation) - demod_symbols)>1e-9)[0]
-
+                erroneous_indexes = np.where(np.abs(PAS_symbols - demod_symbols) > 1e-9)[0]
             elif(NPol==2):
-                continue
+                
+                demod_symbols0, demod_bits0 = pas.PAS_decoder(Phase_Noise_compensated_rx[0], Modbits, λpas, sigma, blockspas, LDPC_encoderpas, kpas, Cpas, PAS_normalisation)
+                erroneous_indexesV = np.where(np.abs(PAS_symbols0 - demod_symbols0) > 1e-9)[0]
+
+                demod_symbols1, demod_bits1 = pas.PAS_decoder(Phase_Noise_compensated_rx[1], Modbits, λpas, sigma, blockspas, LDPC_encoderpas, kpas, Cpas, PAS_normalisation)
+                erroneous_indexesH = np.where(np.abs(PAS_symbols1 - demod_symbols1) > 1e-9)[0]
+                demod_bits = np.array([demod_bits0,demod_bits1])
+                demod_symbols = np.array([demod_symbols0,demod_symbols1])
 
         elif(toggle_DE==True):
             if(NPol==1):
@@ -301,7 +323,6 @@ def main():
                 demod_bits0 = f.Differential_decode_symbols(Phase_Noise_compensated_rx[0], Modbits)
                 demod_bits1 = f.Differential_decode_symbols(Phase_Noise_compensated_rx[1], Modbits)
                 demod_bits = np.array([demod_bits0, demod_bits1])
-
                 erroneous_bit_indexesV = np.where(original_bits[0]!=demod_bits[0])[0] #Vertical Polarisation
                 erroneous_bit_indexesH = np.where(original_bits[1]!=demod_bits[1])[0] #Horizontal Polarisation
 
@@ -334,13 +355,11 @@ def main():
                 if(AIR_type=='GMI'):
                     AIR[i] = p.AIR_SDBW(symbols, original_bits, Phase_Noise_compensated_rx, Modbits)
                 elif(AIR_type=='MI'):
-                    if(toggle_PAS==True):
-                        AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
-                    else:
-                        AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
+                    AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
+                    
         elif(NPol==2):
-            #BER[i] = (np.sum(original_bits[0] != demod_bits[0])+np.sum(original_bits[1] != demod_bits[1]))/(NPol*num_symbols*Modbits)
-            BER[i] = np.sum(original_bits[0] != demod_bits[0])/(num_symbols*Modbits)
+            BER[i] = (np.sum(original_bits[0] != demod_bits[0])+np.sum(original_bits[1] != demod_bits[1]))/(NPol*num_symbols*Modbits)
+            #BER[i] = np.sum(original_bits[0] != demod_bits[0])/(num_symbols*Modbits)
             if(AIR_type=='GMI'):
                 AIR[i] = (p.AIR_SDBW(symbols[0], original_bits[0], Phase_Noise_compensated_rx[0], Modbits) + p.AIR_SDBW(symbols[1], original_bits[1], Phase_Noise_compensated_rx[1], Modbits))/2
             elif(AIR_type=='MI'):
@@ -485,7 +504,7 @@ def main():
             plt.legend(loc='lower left')
             plt.ylim(0, max(AIR_theoretical[-1],max(AIR))+0.5)
         elif(AIR_type=='MI'):
-            AIR_theoretical = p. AIR_SDSW_theoretical(snr_db, Modbits)
+            AIR_theoretical = p.AIR_SDSW_theoretical(snr_db, Modbits)
             plt.figure()
             M = int(2**Modbits)
             plt.title(f"SD-SW AIRs with {M}-QAM")

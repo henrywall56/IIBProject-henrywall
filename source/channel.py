@@ -5,7 +5,7 @@ import parameters as p
    
 def channel(pulse_shaped_symbols):
     #mod_param is a Modulation_param class type
-    #snrb_db is the snr per bit
+    #snr_db is the snr per symbol
     #sps is samples per symbol
     #IQ_Mod_param is IQ_Mod_param class type
     #laser_param is a laser_param class type
@@ -15,7 +15,7 @@ def channel(pulse_shaped_symbols):
     Modbits = p.Mod_param.Modbits
     Rs = p.Mod_param.Rs
     NPol = p.Mod_param.NPol
-    snrb_db = p.fibre_param.snrb_db
+    snr_db = p.fibre_param.snr_db #per symbol
     sps = p.RRC_param.sps
 
     #IQ Modulator Parameters (Mach-Zehnder Modulators Parameters):
@@ -42,16 +42,19 @@ def channel(pulse_shaped_symbols):
 
     #Phase_Noise_rx, theta = f.add_phase_noise(tx, num_symbols, sps, Rs, Linewidth, toggle=t.toggle_phasenoise) #Phase noise added at transmitting laser
 
-    Elaser, theta = f.Laser(laser_power, Linewidth, sps, Rs, p.Mod_param.num_symbols, NPol, p.toggle.toggle_phasenoise) #Laser phase noise
+    Elaser, p.laser_param.theta = f.Laser(laser_power, Linewidth, sps, Rs, p.Mod_param.num_symbols, NPol, p.toggle.toggle_phasenoise) #Laser phase noise
 
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
-    laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
+    if(NPol==1):
+        laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
+    else:
+        laser_norm = np.sum(abs(Laser_Eoutput)**2)/(2*Laser_Eoutput.shape[1])
     Laser_Eoutput = Laser_Eoutput/np.sqrt(laser_norm) #normal
         
-    print(f'Processing SNR {snrb_db}')
+    print(f'Processing SNR {snr_db}')
 
-    Gaussian_noise_signal, p.PAS_param.sigma = f.add_noise(Laser_Eoutput, snrb_db, sps, Modbits, NPol, p.toggle.toggle_AWGNnoise) 
- 
+    Gaussian_noise_signal, p.PAS_param.sigma = f.add_noise(Laser_Eoutput, snr_db, sps, Modbits, NPol, p.toggle.toggle_AWGNnoise) 
+    
     if(p.toggle.toggle_NL==False):
         
         CD_NL_signal = f.add_chromatic_dispersion(Gaussian_noise_signal, p.RRC_param.sps, Rs, D, Clambda, L, NPol, p.toggle.toggle_CD)
