@@ -8,9 +8,12 @@ import parameters as p
 def rx(rx):
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
+    rx_norm0 = rx[0]/np.sqrt(np.sum(np.abs(rx[0])**2)/(rx.shape[1]))
+    rx_norm1 = rx[1]/np.sqrt(np.sum(np.abs(rx[1])**2)/(rx.shape[1]))
+    rx_norm = np.array([rx_norm0,rx_norm1])
     
-    filtered_signal = f.matched_filter(rx, p.RRC_param.RRCimpulse, NPol, toggle=p.toggle.toggle_RRC) #if toggle is False, this function returns input
-    
+    # filtered_signal = f.matched_filter(rx, p.RRC_param.RRCimpulse, NPol, toggle=p.toggle.toggle_RRC) #if toggle is False, this function returns input
+    filtered_signal = rx_norm
     ADC = f.downsample(filtered_signal, p.RRC_param.sps//2, NPol, toggle=p.toggle.toggle_RRC) #Simulate ADC downsampling to 2 sps
     
     #Chromatic Dispersion Compensation

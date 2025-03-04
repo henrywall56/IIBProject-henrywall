@@ -91,15 +91,15 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 4,
-        Rs = 200e9,
+        Modbits = 2,
+        Rs = 50e9,
         NPol = 2,
         num_power = 15
 )
 
 RRC_param = RRC_paramX(
-        span=20, 
-        sps=16, 
+        span=100, 
+        sps=2, 
         rolloff=0.1
 )
 
@@ -111,7 +111,7 @@ fibre_param = fibre_paramX(
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
-        Vpi=1.05
+        Vpi=1.0
 )
 
 Linewidth = 100*10**3
@@ -120,18 +120,18 @@ Linewidth = 100*10**3
 toggle = toggleX(
         toggle_RRC = True,
         toggle_AWGNnoise = True,
-        toggle_phasenoise = True,
-        toggle_phasenoisecompensation = True,
+        toggle_phasenoise = False,
+        toggle_phasenoisecompensation = False,
         toggle_plotuncompensatedphase = False,
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
         toggle_DE = False,
-        toggle_frequencyrecovery = False,
+        toggle_frequencyrecovery = True,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = False,
+        toggle_adaptive_equalisation = True,    
         toggle_PAS = False,
         AIR_type = 'MI'
 )
@@ -146,18 +146,18 @@ maxDvT = Linewidth/(Mod_param.Rs*sps)
 laser_param = laser_paramX(
         Linewidth = Linewidth,
         maxDvT = maxDvT, 
-        laser_power = 0 #dBm
+        laser_power = 16 #dBm
 )
 
 
 CD_param = CD_paramX(fibre_param.D, fibre_param.Clambda, Mod_param.Rs, fibre_param.L)
 
 AE_param = AE_paramX(
-        NTaps = 4,
-        mu = 5e-4,
-        N1 = 2000,
+        NTaps = 11,
+        mu = 1e-3,
+        N1 = 3000,
         N2 = 5000,
-        Ndiscard = 12000
+        Ndiscard = 8000
 )
 
 BPS_param = BPS_paramX(

@@ -243,7 +243,9 @@ def regroup_LLRs(LLR, Modbits):
         return np.array(LLR_regrouped)
 
 def PAS_parameters(Modbits,λ):
-    if(Modbits==4):
+    if(Modbits==2):
+        return 1,1,1,1
+    elif(Modbits==4):
         signal_points = [1,3]
         N_target = 901
         const = 0
