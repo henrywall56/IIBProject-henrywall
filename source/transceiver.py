@@ -7,6 +7,7 @@ import rx
 import parameters as p
 import performance_evaluation as pe
 import os
+import scipy
 
 if(p.toggle.toggle_PAS==False):
     original_bits = f.generate_original_bits(p.Mod_param.num_symbols, p.Mod_param.Modbits, p.Mod_param.NPol) #NPol-dimensional array
@@ -19,21 +20,23 @@ else:
 run=1
 script_dir = os.path.dirname(os.path.abspath(__file__))
 original_bits_save_dir = os.path.join(script_dir, "data/original_bits")
-pulse_shaped_symbols_save_dir = os.path.join(script_dir, "data/pulseshaped_symbols")
+source_symbols_save_dir = os.path.join(script_dir, "data/source_symbols")
 if(p.Mod_param.NPol==1):
     np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_{run}.csv"), original_bits, delimiter=",", fmt="%d")
 else:
     np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"), original_bits[0], delimiter=",", fmt="%d")
     np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"), original_bits[1], delimiter=",", fmt="%d")
 
-obits0 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"))
-obits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
-obits = np.array([obits0,obits1])
+
 #######################
 
 pulse_shaped_symbols, source_symbols = tx.tx(original_bits)
 
+source_symbols_dict = {"source symbols Pol0": source_symbols[0],
+                        "source symbols Pol1": source_symbols[1]
+                        }
 
+scipy.io.savemat(os.path.join(source_symbols_save_dir, f"source_symbols_0403_{run}.mat"), source_symbols_dict)
 
 channel_output = channel.channel(pulse_shaped_symbols)
 
