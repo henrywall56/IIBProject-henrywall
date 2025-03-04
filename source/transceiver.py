@@ -27,16 +27,33 @@ else:
     np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"), original_bits[0], delimiter=",", fmt="%d")
     np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"), original_bits[1], delimiter=",", fmt="%d")
 
-
 #######################
 
 pulse_shaped_symbols, source_symbols = tx.tx(original_bits)
 
-source_symbols_dict = {"source symbols Pol0": source_symbols[0],
-                        "source symbols Pol1": source_symbols[1]
+source_symbols0_real = source_symbols[0].real
+source_symbols0_imag = source_symbols[0].imag
+source_symbols1_real = source_symbols[1].real
+source_symbols1_imag = source_symbols[1].imag
+
+source_symbols_dict_0real = {"source symbols Pol0 real": source_symbols0_real
+                        }
+source_symbols_dict_0imag = {"source symbols Pol0 real": source_symbols0_imag
+                        }
+source_symbols_dict_1real = {"source symbols Pol0 real": source_symbols1_real
+                        }
+source_symbols_dict_1imag = {"source symbols Pol0 real": source_symbols1_imag
                         }
 
-scipy.io.savemat(os.path.join(source_symbols_save_dir, f"source_symbols_0403_{run}.mat"), source_symbols_dict)
+scipy.io.savemat(os.path.join(source_symbols_save_dir, f"source_symbols_0403_Pol0_real_{run}.mat"), source_symbols_dict_0real)
+
+scipy.io.savemat(os.path.join(source_symbols_save_dir, f"source_symbols_0403_Pol0_imag_{run}.mat"), source_symbols_dict_0imag)
+
+scipy.io.savemat(os.path.join(source_symbols_save_dir, f"source_symbols_0403_Pol1_real_{run}.mat"), source_symbols_dict_1real)
+
+scipy.io.savemat(os.path.join(source_symbols_save_dir, f"source_symbols_0403_Pol1_imag_{run}.mat"), source_symbols_dict_1imag)
+
+
 
 channel_output = channel.channel(pulse_shaped_symbols)
 
