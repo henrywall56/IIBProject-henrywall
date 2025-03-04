@@ -49,7 +49,8 @@ def generate_QPSK_symbols(bits):
     symbols = np.array([
         symbol_mapping[tuple(bits[i:i + 2])] for i in range(0, len(bits), 2)
     ])
-    return symbols/np.sqrt(2)
+    #return symbols/np.sqrt(2)
+    return symbols
 
 @benchmark(enable_benchmark)
 def generate_16qam_symbols(bits):
@@ -77,7 +78,8 @@ def generate_16qam_symbols(bits):
     symbols = np.array([
         symbol_mapping[tuple(bits[i:i + 4])] for i in range(0, len(bits), 4)
     ])
-    return symbols/np.sqrt(10)
+    # return symbols/np.sqrt(10)
+    return symbols
 
 @benchmark(enable_benchmark)
 def generate_64qam_symbols(bits):
@@ -403,8 +405,8 @@ def matched_filter(signal, pulse_shape, NPol, toggle):
         return signal/(np.sqrt(np.mean(abs(signal)**2)))
 
 @benchmark(enable_benchmark)
-def plot_constellation(ax, symbols, title, lim=2, alpha=0.5):
-    ax.scatter(symbols.real, symbols.imag, color='blue', alpha=alpha)
+def plot_constellation(ax, symbols, title, lim=2, alpha=0.2):
+    ax.scatter(symbols.real, symbols.imag, color='blue', alpha=alpha, s=3)
     ax.set_title(title)
     ax.set_xlabel('In-Phase')
     ax.set_ylabel('Quadrature')
@@ -1182,7 +1184,7 @@ def frequency_recovery(y, Rs, NPol, toggle_frequencyrecovery):
             z0 = y[0]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
             z1 = y[1]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
             
-            print(f'Delta_f from frequency recovery: {Delta_f}Hz')
+            print(f'Delta_f from frequency recovery: {Delta_f/1e9} GHz')
             return np.array([z0,z1], dtype=complex)
     else:
         return y

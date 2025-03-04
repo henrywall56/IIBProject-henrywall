@@ -57,8 +57,7 @@ def tx(original_bits):
         print('--------------------------------------')
 
     else:
-        print('hekjhfkhjf')
-        
+
         λpas = p.PAS_param.λ
         kpas, Npas, Cpas, LDPC_encoderpas = p.PAS_param.k, p.PAS_param.N, p.PAS_param.C, p.PAS_param.LDPC_encoder
         
