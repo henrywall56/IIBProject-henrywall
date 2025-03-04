@@ -6,6 +6,7 @@ import channel
 import rx
 import parameters as p
 import performance_evaluation as pe
+import os
 
 if(p.toggle.toggle_PAS==False):
     original_bits = f.generate_original_bits(p.Mod_param.num_symbols, p.Mod_param.Modbits, p.Mod_param.NPol) #NPol-dimensional array
@@ -14,7 +15,25 @@ else:
     original_bits = np.random.randint(0, 2, size= p.PAS_param.k*p.PAS_param.blocks*2*p.Mod_param.NPol)
     original_bits = original_bits.reshape((2,len(original_bits)//2))
 
+ ####### SAVING #######
+run=1
+script_dir = os.path.dirname(os.path.abspath(__file__))
+original_bits_save_dir = os.path.join(script_dir, "data/original_bits")
+pulse_shaped_symbols_save_dir = os.path.join(script_dir, "data/pulseshaped_symbols")
+if(p.Mod_param.NPol==1):
+    np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_{run}.csv"), original_bits, delimiter=",", fmt="%d")
+else:
+    np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"), original_bits[0], delimiter=",", fmt="%d")
+    np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"), original_bits[1], delimiter=",", fmt="%d")
+
+obits0 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"))
+obits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
+obits = np.array([obits0,obits1])
+#######################
+
 pulse_shaped_symbols, source_symbols = tx.tx(original_bits)
+
+
 
 channel_output = channel.channel(pulse_shaped_symbols)
 
