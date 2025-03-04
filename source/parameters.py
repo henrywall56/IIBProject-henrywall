@@ -91,10 +91,10 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 6,
+        Modbits = 4,
         Rs = 200e9,
         NPol = 2,
-        num_power = 16
+        num_power = 15
 )
 
 RRC_param = RRC_paramX(
@@ -132,7 +132,7 @@ toggle = toggleX(
         toggle_CD_compensation = False,
         toggle_AIR = True,
         toggle_adaptive_equalisation = False,
-        toggle_PAS = True,
+        toggle_PAS = False,
         AIR_type = 'MI'
 )
 
