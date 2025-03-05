@@ -34,17 +34,17 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 """
 def main():
     
-    num_power = 16
+    num_power = 15
     num_symbols = 2**num_power #Number of symbols in each polarisation
                                #Overwritten if PAS used
-    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
     
     #Generate RRC filter impulse response
     #base 20, 16, 0.1
     span = 20 #Span of filter
-    sps = 16 #Samples per symbol
+    sps = 2 #Samples per symbol
     rolloff = 0.1 #Roll-off of RRC
 
     #IQ Modulator Parameters (Mach-Zehnder Modulators Parameters):
@@ -93,8 +93,8 @@ def main():
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
-    toggle_phasenoise = True #toggle phase noise
-    toggle_phasenoisecompensation = True #toggle phase noise compensation
+    toggle_phasenoise = False #toggle phase noise
+    toggle_phasenoisecompensation = False #toggle phase noise compensation
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = False #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
@@ -106,7 +106,7 @@ def main():
     toggle_AIR = True
     toggle_adaptive_equalisation = True
     AIR_type = 'MI' #'MI' or 'GMI'
-    toggle_PAS = True
+    toggle_PAS = False
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -258,11 +258,11 @@ def main():
         CD_compensated_rx = f.CD_compensation(ADC, D, L, Clambda, Rs, NPol, spsCD, NFFT, NOverlap, toggle_CD_compensation)
         
         if(toggle_adaptive_equalisation == True and NPol == 2):
-            NTaps = 4
-            mu = 5e-4 
-            N1=2000
+            NTaps = 11
+            mu = 1e-3
+            N1= 3000
             N2=5000
-            Ndiscard=12000
+            Ndiscard=8000
             if(Modbits==2):
                 AE_Type='CMA'
             else:
@@ -276,7 +276,10 @@ def main():
             print('CMA to RDE switch at:   ', N2)
             print('Samples discarded:      ', Ndiscard)
             print('--------------------------------------')
-            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, AE_Type, NTaps, mu, True, N1, N2)
+            CD_compensated_rx_norm0 = CD_compensated_rx[0]/np.mean(np.abs(CD_compensated_rx[0])**2)
+            CD_compensated_rx_norm1 = CD_compensated_rx[1]/np.mean(np.abs(CD_compensated_rx[1])**2)
+            CD_compensated_rx_norm = np.array([CD_compensated_rx_norm0,CD_compensated_rx_norm1])
+            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx_norm ,2, AE_Type, NTaps, mu, True, N1, N2)
             downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
             downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:Ndiscard], adaptive_eq_rx[:, Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
 

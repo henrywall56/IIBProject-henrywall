@@ -384,6 +384,17 @@ def AIR_SDSW(x,y,Modbits):
     return AIR
 
 def performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols):
+    processed_symbols0 = processed_symbols[0]/np.sqrt(np.mean(np.abs(processed_symbols[0])**2))
+    processed_symbols1 = processed_symbols[1]/np.sqrt(np.mean(np.abs(processed_symbols[1])**2))
+    processed_symbols = np.array([processed_symbols0,processed_symbols1])
+    
+    if(p.Mod_param.Modbits==2):
+        source_symbols = source_symbols/np.sqrt(2)
+    elif(p.Mod_param.Modbits==4):
+        source_symbols = source_symbols/np.sqrt(10)
+    elif(p.Mod_param.Modbits==6):
+        source_symbols = source_symbols/np.sqrt(42)
+
     if(p.Mod_param.NPol==1):
         BER = np.mean(original_bits != demodulated_bits)
         if(p.toggle.toggle_AIR==True):

@@ -1392,9 +1392,10 @@ def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2):
         #N1: number of coefficent calculations to perform prior to proper initialisation of w2H, w2V.
         #N2: number of coefficient calculations to peform prior to switch from CMA to RDE (only defined if CMA used for intialisation).
         
-        #Radii for constellations with unitary power:
-        input = input/(np.sqrt(np.mean(abs(input)**2)))
-        
+        input_norm0 = input[0]/np.sqrt(np.sum(np.abs(input[0])**2)/(input.shape[1]))
+        input_norm1 = input[1]/np.sqrt(np.sum(np.abs(input[1])**2)/(input.shape[1]))
+        input_norm = np.array([input_norm0,input_norm1])
+
         #Equalisation algorithms:
         CMAFlag = False
         RDEFlag = False
@@ -1420,7 +1421,7 @@ def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2):
             R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)])
 
         #Input Blocks:
-        x = np.concatenate([input[:,-1*int(np.floor(NTaps/2)):], input, input[:,:int(np.floor(NTaps/2))]], axis=1)
+        x = np.concatenate([input_norm[:,-1*int(np.floor(NTaps/2)):], input_norm, input_norm[:,:int(np.floor(NTaps/2))]], axis=1)
         
         xV = convmtx(x[0], NTaps)
         xH = convmtx(x[1], NTaps)
@@ -1533,3 +1534,112 @@ def mix_polarization_signals(signal, angle_deg):
     rotated_signals = np.dot(rotation_matrix, signal)
     
     return rotated_signals
+
+
+@benchmark(enable_benchmark)
+def AE_4x4(input,mu,NTaps, Modbits):
+    
+    N = input.shape[1]
+    input_norm0 = input[0]/np.sqrt(np.sum(np.abs(input[0])**2)/(input.shape[1]))
+    input_norm1 = input[1]/np.sqrt(np.sum(np.abs(input[1])**2)/(input.shape[1]))
+    input_norm = np.array([input_norm0,input_norm1])
+    
+    Xor = np.zeros(N,dtype=np.float64)
+    Xoi = np.zeros(N,dtype=np.float64)
+
+    Yor = np.zeros(N,dtype=np.float64)
+    Yoi = np.zeros(N,dtype=np.float64)
+
+    Xo = np.zeros(N,dtype=np.complex128)
+    Yo = np.zeros(N,dtype=np.complex128)
+
+    #filters are real valued
+    Hxrxr = np.zeros(NTaps,dtype=np.float64)
+    Hxixr = np.zeros(NTaps,dtype=np.float64)
+    Hyrxr = np.zeros(NTaps,dtype=np.float64)
+    Hyixr = np.zeros(NTaps,dtype=np.float64)
+
+    Hxrxi = np.zeros(NTaps,dtype=np.float64)
+    Hxixi = np.zeros(NTaps,dtype=np.float64)
+    Hyrxi = np.zeros(NTaps,dtype=np.float64)
+    Hyixi = np.zeros(NTaps,dtype=np.float64)
+
+    Hxryr = np.zeros(NTaps,dtype=np.float64)
+    Hxiyr = np.zeros(NTaps,dtype=np.float64)
+    Hyryr = np.zeros(NTaps,dtype=np.float64)
+    Hyiyr = np.zeros(NTaps,dtype=np.float64)
+
+    Hxryi = np.zeros(NTaps,dtype=np.float64)
+    Hxiyi = np.zeros(NTaps,dtype=np.float64)
+    Hyryi = np.zeros(NTaps,dtype=np.float64)
+    Hyiyi = np.zeros(NTaps,dtype=np.float64)
+
+    Hxrxr[NTaps // 2] = 1
+    Hxrxi[NTaps // 2] = 0.1
+    Hxixr[NTaps // 2] = 0.1
+    Hxixi[NTaps // 2] = 1
+
+    Hyryr[NTaps // 2] = 1
+    Hyryi[NTaps // 2] = 0.1
+    Hyiyr[NTaps // 2] = 0.1
+    Hyiyi[NTaps // 2] = 1
+
+    R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)]) #16-QAM
+
+    for i in range(NTaps, N):
+        X_in  = input_norm[0][i-NTaps:i]
+        X_inI = np.real(X_in)
+        X_inQ = np.imag(X_in)
+        Y_in  = input_norm[1][i-NTaps:i]
+        Y_inI = np.real(Y_in)
+        Y_inQ = np.imag(Y_in)
+        # #flip to convolve
+        _X_inI = np.flip(X_inI)
+        _X_inQ = np.flip(X_inQ)
+        _Y_inI = np.flip(Y_inI)
+        _Y_inQ = np.flip(Y_inQ)
+
+        Xor[i] = np.sum(Hxrxr * _X_inI) + np.sum(Hxixr * _X_inQ) + np.sum(Hyrxr * _Y_inI) + np.sum(Hyixr * _Y_inQ)
+        Xoi[i] = np.sum(Hxrxi * _X_inI) + np.sum(Hxixi * _X_inQ) + np.sum(Hyrxi * _Y_inI) + np.sum(Hyixi * _Y_inQ)
+        Yor[i] = np.sum(Hxryr * _X_inI) + np.sum(Hxiyr * _X_inQ) + np.sum(Hyryr * _Y_inI) + np.sum(Hyiyr * _Y_inQ)
+        Yoi[i] = np.sum(Hxryi * _X_inI) + np.sum(Hxiyi * _X_inQ) + np.sum(Hyryi * _Y_inI) + np.sum(Hyiyi * _Y_inQ)
+
+        if(Modbits==2):
+            R_CMA = 1
+            epsilon_x = R_CMA - np.abs(Xor[i] + 1j*Xoi[i])**2
+            epsilon_y = R_CMA - np.abs(Yor[i] + 1j*Yoi[i])**2
+
+
+        elif(Modbits == 4):
+            Rx = R_RDE[np.argmin(np.abs(R_RDE-np.abs(Xor[i]+1j*Xoi[i])))]
+            Ry = R_RDE[np.argmin(np.abs(R_RDE-np.abs(Yor[i]+1j*Yoi[i])))]
+            
+            epsilon_x = Rx**2 - (Xor[i]**2 + Xoi[i]**2)
+            epsilon_y = Ry**2 - (Yor[i]**2 + Yoi[i]**2)
+
+        Xo[i] = Xor[i] + 1j*Xoi[i]
+        Yo[i] = Yor[i] + 1j*Yoi[i]
+
+        Hxrxr += mu * epsilon_x * Xor[i] * _X_inI
+        Hxixr += mu * epsilon_x * Xor[i] * _X_inQ
+        Hyrxr += mu * epsilon_x * Xor[i] * _Y_inI
+        Hyixr += mu * epsilon_x * Xor[i] * _Y_inQ
+
+        Hxrxi += mu * epsilon_x * Xoi[i] * _X_inI
+        Hxixi += mu * epsilon_x * Xoi[i] * _X_inQ
+        Hyrxi += mu * epsilon_x * Xoi[i] * _Y_inI
+        Hyixi += mu * epsilon_x * Xoi[i] * _Y_inQ
+
+        Hxryr += mu * epsilon_y * Yor[i] * _X_inI
+        Hxiyr += mu * epsilon_y * Yor[i] * _X_inQ
+        Hyryr += mu * epsilon_y * Yor[i] * _Y_inI
+        Hyiyr += mu * epsilon_y * Yor[i] * _Y_inQ
+
+        Hxryi += mu * epsilon_y * Yoi[i] * _X_inI
+        Hxiyi += mu * epsilon_y * Yoi[i] * _X_inQ
+        Hyryi += mu * epsilon_y * Yoi[i] * _Y_inI
+        Hyiyi += mu * epsilon_y * Yoi[i] * _Y_inQ
+
+        
+
+    return np.array([Xo,Yo])

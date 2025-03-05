@@ -8,12 +8,12 @@ import parameters as p
 def rx(rx):
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
-    rx_norm0 = rx[0]/np.sqrt(np.sum(np.abs(rx[0])**2)/(rx.shape[1]))
-    rx_norm1 = rx[1]/np.sqrt(np.sum(np.abs(rx[1])**2)/(rx.shape[1]))
-    rx_norm = np.array([rx_norm0,rx_norm1])
-    
-    # filtered_signal = f.matched_filter(rx, p.RRC_param.RRCimpulse, NPol, toggle=p.toggle.toggle_RRC) #if toggle is False, this function returns input
-    filtered_signal = rx_norm
+
+    if(p.lab_testing==False):
+        filtered_signal = f.matched_filter(rx, p.RRC_param.RRCimpulse, NPol, toggle=p.toggle.toggle_RRC) #if toggle is False, this function returns input
+    else:
+        filtered_signal = rx
+
     ADC = f.downsample(filtered_signal, p.RRC_param.sps//2, NPol, toggle=p.toggle.toggle_RRC) #Simulate ADC downsampling to 2 sps
     
     #Chromatic Dispersion Compensation
@@ -25,31 +25,37 @@ def rx(rx):
     CD_compensated_rx = f.CD_compensation(ADC, p.fibre_param.D, p.fibre_param.L, p.fibre_param.Clambda, p.Mod_param.Rs, NPol, spsCD, p.CD_param.NFFT, p.CD_param.NOverlap, p.toggle.toggle_CD_compensation)
     
     if(p.toggle.toggle_adaptive_equalisation == True and NPol == 2):
-        if(Modbits==2):
-            AE_Type='CMA'
-        else:
-            AE_Type='CMA+RDE'
-        print('--------------------------------------')
-        print('Adaptive Equalisation Parameters:')
-        print('Update used:            ', AE_Type)
-        print('Number of taps:         ', p.AE_param.NTaps)
-        print('μ:                      ', p.AE_param.mu)
-        print('2nd Filter starts at:   ', p.AE_param.N1)
-        print('CMA to RDE switch at:   ', p.AE_param.N2)
-        print('Samples discarded:      ', p.AE_param.Ndiscard)
-        print('--------------------------------------')
-        adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, AE_Type, p.AE_param.NTaps, p.AE_param.mu, True, p.AE_param.N1, p.AE_param.N2)
-        downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
-        downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:p.AE_param.Ndiscard], adaptive_eq_rx[:, p.AE_param.Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
+        if(p.AE_param.AE_type=="2x2"):
+            if(Modbits==2):
+                AE_Type='CMA'
+            else:
+                AE_Type='CMA+RDE'
+            print('--------------------------------------')
+            print('Adaptive Equalisation Parameters:')
+            print('Update used:            ', AE_Type)
+            print('Number of taps:         ', p.AE_param.NTaps)
+            print('μ:                      ', p.AE_param.mu)
+            print('2nd Filter starts at:   ', p.AE_param.N1)
+            print('CMA to RDE switch at:   ', p.AE_param.N2)
+            print('Samples discarded:      ', p.AE_param.Ndiscard)
+            print('--------------------------------------')
+            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, AE_Type, p.AE_param.NTaps, p.AE_param.mu, True, p.AE_param.N1, p.AE_param.N2)
+            downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
+            downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:p.AE_param.Ndiscard], adaptive_eq_rx[:, p.AE_param.Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
 
+            
+        elif(p.AE_param.AE_type=="4x4"):
+            adaptive_eq_rx = f.AE_4x4(CD_compensated_rx,p.AE_param.mu,p.AE_param.NTaps, p.Mod_param.Modbits)
+            downsampled_rx = f.downsample(adaptive_eq_rx, 2, NPol, True)
         #downsampling done within adaptive equalisation
         figAE, axsAE = plt.subplots(1,1, figsize=(8,8))
         axsAE.plot(abs(adaptive_eq_rx[0]), linestyle='', marker='o', markersize='1', color='b', label='y1 mag.')
         axsAE.set_ylabel('magnitude of symbols')
         axsAE.plot(abs(adaptive_eq_rx[1]), linestyle='', marker='o', markersize='1', color='r', label='y2 mag.')
         axsAE.set_ylim(0,3)
-        axsAE.vlines(p.AE_param.N1, colors='purple', label='N1', ymin=0, ymax=3)
-        axsAE.vlines(p.AE_param.N2, colors='green', label='N2', ymin=0, ymax=3)
+        if(p.AE_param.AE_type=="2x2"):
+            axsAE.vlines(p.AE_param.N1, colors='purple', label='N1', ymin=0, ymax=3)
+            axsAE.vlines(p.AE_param.N2, colors='green', label='N2', ymin=0, ymax=3)
         axsAE.vlines(p.AE_param.Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
         axsAE.legend()
 
