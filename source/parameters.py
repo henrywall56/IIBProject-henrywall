@@ -68,12 +68,13 @@ class CD_paramX:
         self.NOverlap = int(ideal_NOverlap) #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
 
 class AE_paramX:
-    def __init__(self, NTaps, mu ,N1, N2, Ndiscard):
+    def __init__(self, NTaps, mu ,N1, N2, Ndiscard, AE_type):
         self.NTaps = NTaps
         self.mu = mu
         self.N1 = N1
         self.N2 = N2
         self.Ndiscard = Ndiscard
+        self.AE_type = AE_type
 
 class BPS_paramX:
     def __init__(self, B, N):
@@ -107,7 +108,7 @@ fibre_param = fibre_paramX(
         L=1000*1e3, 
         D=17, 
         Clambda=1550/1e9,
-        snr_db = 23 #per symbol
+        snr_db = 17 #per symbol
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
@@ -155,9 +156,10 @@ CD_param = CD_paramX(fibre_param.D, fibre_param.Clambda, Mod_param.Rs, fibre_par
 AE_param = AE_paramX(
         NTaps = 11,
         mu = 1e-3,
-        N1 = 3000,
-        N2 = 5000,
-        Ndiscard = 8000
+        N1 = 4000,
+        N2 = 8000,
+        Ndiscard = 10000,
+        AE_type = "4x4"
 )
 
 BPS_param = BPS_paramX(
@@ -169,3 +171,8 @@ PAS_param = PAS_paramX(
         Mod_param.Modbits,
         λ = 0.05
 )
+
+lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
+                   #If true, then transceiver loads in real channel output data
+save_run = False
+run = 3
