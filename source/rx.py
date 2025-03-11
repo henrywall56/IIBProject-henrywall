@@ -27,19 +27,19 @@ def rx(rx):
     if(p.toggle.toggle_adaptive_equalisation == True and NPol == 2):
         if(p.AE_param.AE_type=="2x2"):
             if(Modbits==2):
-                AE_Type='CMA'
-            else:
-                AE_Type='CMA+RDE'
+                flag='CMA'
+            else:   
+                flag='CMA+RDE'
             print('--------------------------------------')
             print('Adaptive Equalisation Parameters:')
-            print('Update used:            ', AE_Type)
+            print('Update used:            ', flag)
             print('Number of taps:         ', p.AE_param.NTaps)
             print('μ:                      ', p.AE_param.mu)
             print('2nd Filter starts at:   ', p.AE_param.N1)
             print('CMA to RDE switch at:   ', p.AE_param.N2)
             print('Samples discarded:      ', p.AE_param.Ndiscard)
             print('--------------------------------------')
-            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, AE_Type, p.AE_param.NTaps, p.AE_param.mu, True, p.AE_param.N1, p.AE_param.N2)
+            adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, flag, p.AE_param.NTaps, p.AE_param.mu, True, p.AE_param.N1, p.AE_param.N2)
             downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
             downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:p.AE_param.Ndiscard], adaptive_eq_rx[:, p.AE_param.Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
 
@@ -47,6 +47,7 @@ def rx(rx):
         elif(p.AE_param.AE_type=="4x4"):
             adaptive_eq_rx = f.AE_4x4(CD_compensated_rx,p.AE_param.mu,p.AE_param.NTaps, p.Mod_param.Modbits)
             downsampled_rx = f.downsample(adaptive_eq_rx, 2, NPol, True)
+
         #downsampling done within adaptive equalisation
         figAE, axsAE = plt.subplots(1,1, figsize=(8,8))
         axsAE.plot(abs(adaptive_eq_rx[0]), linestyle='', marker='o', markersize='1', color='b', label='y1 mag.')
@@ -78,7 +79,7 @@ def rx(rx):
         frac = 0.05
         Phase_Noise_compensated_rx, thetaHat = dd.DD_phase_noise_compensation(downsampled_rx, p.RRC_param.sps, p.Mod_param.Rs, p.laser_param.Linewidth, Modbits, p.Mod_param.snr_db, frac, p.toggle.toggle_phasenoisecompensation)
     
-    if(p.toggle.toggle_phasenoisecompensation==True):
+    if(p.toggle.toggle_phasenoisecompensation==True and p.lab_testing==False):
         figPhase, axsPhase = plt.subplots(1,1, figsize=(8,8))
         axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), p.laser_param.theta[0::p.RRC_param.sps], label='Phase')
         #Note plotting theta before frequency recovery here

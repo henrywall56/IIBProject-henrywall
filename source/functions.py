@@ -1383,6 +1383,7 @@ def SSFM(input, Rs, D, Clambda, L, N, NPol):
       
 @benchmark(enable_benchmark)
 def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2):
+        #2x2
         #input: 2 polarisation input signal. normalised to unit power and obtained at 2 Sa/Symbol.
         #sps: samples per symbol in input signal
         #flag: type of equalisation method used ('CMA', 'RDE', 'CMA+RDE').
@@ -1471,9 +1472,16 @@ def adaptive_equalisation(input, sps, flag, NTaps, Mu, singlespike, N1, N2):
                 w2H = np.conjugate(w1V[::-1]) #reverse and conjugate
                 w2V = -1*np.conjugate(w1H[::-1])
         
+        plt.figure()
+        plt.title('AEQ Tap Weights')
+        plt.plot(abs(w1V),color='black')
+        plt.plot(abs(w1H),color='orange')
+        plt.plot(abs(w2V), color='r')
+        plt.plot(abs(w2H), color='b')
+        
+        
         #Output Samples:
         y = np.array([y1,y2])
-    
         
         return y
 
@@ -1488,8 +1496,9 @@ def CMA(xV, xH, y1, y2, w1V, w1H, w2V, w2H, R, Mu):
     #xV & xH must has same length as w's.
 
     #Outputs updated filter coefficients
-    
 
+    Mu = Mu = gaussian_window(len(w1V), std=1)*Mu
+    
     w1V = w1V + Mu*xV*(R-np.abs(y1)**2)*np.conjugate(y1)
     w1H = w1H + Mu*xH*(R-np.abs(y1)**2)*np.conjugate(y1)
     w2V = w2V + Mu*xV*(R-np.abs(y2)**2)*np.conjugate(y2)
@@ -1512,6 +1521,8 @@ def RDE(xV, xH, y1, y2, w1V, w1H, w2V, w2H, R, Mu):
     r1 = np.argmin(np.abs(R-np.abs(y1))) #reshape y1 from (length,) to (length,1) for broadcasting with R
     r2 = np.argmin(np.abs(R-np.abs(y2)))
 
+    Mu = gaussian_window(len(w1V))*Mu
+
     w1V = w1V + Mu*xV*(R[r1]**2-np.abs(y1)**2)*np.conjugate(y1)
     w1H = w1H + Mu*xH*(R[r1]**2-np.abs(y1)**2)*np.conjugate(y1)
     w2V = w2V + Mu*xV*(R[r2]**2-np.abs(y2)**2)*np.conjugate(y2)
@@ -1519,6 +1530,11 @@ def RDE(xV, xH, y1, y2, w1V, w1H, w2V, w2H, R, Mu):
 
     return w1V, w1H, w2V, w2H
 
+def gaussian_window(N, std=0.5):
+    n = np.arange(N) - (N - 1) / 2  # Centered around zero
+    sigma = std * (N - 1) / 2  # Scale standard deviation
+    window = np.exp(-0.5 * (n / sigma) ** 2)  # Gaussian function
+    return window / np.max(window)  # Normalize to peak at 1
 
 def mix_polarization_signals(signal, angle_deg):
     # Convert the angle to radians
@@ -1584,7 +1600,8 @@ def AE_4x4(input,mu,NTaps, Modbits):
     Hyiyr[NTaps // 2] = 0.1
     Hyiyi[NTaps // 2] = 1
 
-    R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)]) #16-QAM
+    if(Modbits==4):
+        R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)]) #16-QAM
 
     for i in range(NTaps, N):
         X_in  = input_norm[0][i-NTaps:i]
@@ -1616,10 +1633,7 @@ def AE_4x4(input,mu,NTaps, Modbits):
             
             epsilon_x = Rx**2 - (Xor[i]**2 + Xoi[i]**2)
             epsilon_y = Ry**2 - (Yor[i]**2 + Yoi[i]**2)
-
-        Xo[i] = Xor[i] + 1j*Xoi[i]
-        Yo[i] = Yor[i] + 1j*Yoi[i]
-
+   
         Hxrxr += mu * epsilon_x * Xor[i] * _X_inI
         Hxixr += mu * epsilon_x * Xor[i] * _X_inQ
         Hyrxr += mu * epsilon_x * Xor[i] * _Y_inI
@@ -1640,6 +1654,144 @@ def AE_4x4(input,mu,NTaps, Modbits):
         Hyryi += mu * epsilon_y * Yoi[i] * _Y_inI
         Hyiyi += mu * epsilon_y * Yoi[i] * _Y_inQ
 
-        
+
+
+        Xo[i] = Xor[i] + Xoi[i]*1j
+        Yo[i] = Yor[i] + Yoi[i]*1j
 
     return np.array([Xo,Yo])
+
+def trained_2x2_AEQ(input, Mu, NTaps, Ntrain, N1, Modbits, d):
+        #input: 2 polarisation input signal. normalised to unit power and obtained at 2 Sa/Symbol.
+        #NTaps: number of taps for the filters in the butterfly configuration.
+        #Mu: step-size for coefficients calculation.
+        #d: known training symbols, used for first Ntrain steps
+
+
+        input_norm0 = input[0]/np.sqrt(np.sum(np.abs(input[0])**2)/(input.shape[1]))
+        input_norm1 = input[1]/np.sqrt(np.sum(np.abs(input[1])**2)/(input.shape[1]))
+        input_norm = np.array([input_norm0,input_norm1])
+
+        d1 = d[0]/np.sqrt(np.sum(np.abs(d[0])**2)/(d.shape[1]))
+        d2 = d[1]/np.sqrt(np.sum(np.abs(d[1])**2)/(d.shape[1]))
+
+        
+
+        if(Modbits==2):
+            R_CMA = 1
+        
+        if(Modbits==4):
+            R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)])
+            R_CMA = 1.32
+
+        #Input Blocks:
+        x = np.concatenate([input_norm[:,-1*int(np.floor(NTaps/2)):], input_norm, input_norm[:,:int(np.floor(NTaps/2))]], axis=1)
+        
+        xV = convmtx(x[0], NTaps)
+        xH = convmtx(x[1], NTaps)
+        
+        xV = xV[:, NTaps:xV.shape[1]-NTaps+1:2]
+        xH = xH[:, NTaps:xH.shape[1]-NTaps+1:2]
+
+        #Output Length:
+        OutLength = int(np.floor((x.shape[1]-NTaps+1)/2))
+        
+        #Initialising the outputs:
+        y1 = np.zeros(OutLength, dtype=complex)
+        y2 = np.zeros(OutLength, dtype=complex)
+
+        #Initialising filter coefficients:
+        w1V = np.zeros(NTaps, dtype=complex)
+        w1H = np.zeros(NTaps, dtype=complex)
+        w2V = np.zeros(NTaps, dtype=complex)
+        w2H = np.zeros(NTaps, dtype=complex)
+
+        #Initialise with a single spike
+        w1V[int(np.floor(NTaps/2))] = 1
+            
+        for i in range(OutLength):
+            #Calculating the outputs:
+            y1[i] = np.dot(np.conjugate(w1V), xV[:,i]) + np.dot(np.conjugate(w1H), xH[:,i])
+            y2[i] = np.dot(np.conjugate(w2V), xV[:,i]) + np.dot(np.conjugate(w2H), xH[:,i])
+
+            #Updating the filter coefficients:
+            if(Modbits==2):
+                #Constant modulus algorithm:
+                w1V, w1H, w2V, w2H = CMA(xV[:,i], xH[:,i], y1[i], y2[i], w1V, w1H, w2V, w2H, R_CMA, Mu)
+            
+            elif(Modbits==4):
+                if(i<Ntrain):
+                    #Radius-directed equalisation
+                    w1V, w1H, w2V, w2H = RDE(xV[:,i], xH[:,i], y1[i], y2[i], w1V, w1H, w2V, w2H, R_RDE, Mu)
+                else:
+                    w1V, w1H, w2V, w2H = trained_update(xV[:,i], xH[:,i], y1[i], y2[i], w1V, w1H, w2V, w2H, Mu, d1[i], d2[i])
+
+            #reinitialisation of the filter coefficients:
+            if(i==N1):
+                w2H = np.conjugate(w1V[::-1]) #reverse and conjugate
+                w2V = -1*np.conjugate(w1H[::-1])
+        
+
+        #Output Samples:
+        y = np.array([y1,y2])
+        
+        return y
+
+def trained_update(xV, xH, y1, y2, w1V, w1H, w2V, w2H, Mu, d1, d2):
+    #d1, d2 are known training symbols 
+
+    w1V += Mu * xV * np.conj(d1 - y1)
+    w1H += Mu * xH * np.conj(d1 - y1)
+    w2V += Mu * xV * np.conj(d2 - y2)
+    w2H += Mu * xH * np.conj(d2 - y2)
+
+    return w1V, w1H, w2V, w2H
+
+def align_symbols_1Pol(source, processed, demodulated):
+    #for one polarisaiton
+    #align using autocorrelation
+    N = len(source)
+
+    # Compute FFT-based cross-correlation
+    X = fft(source)
+    Y = fft(processed)
+    autocorr = np.real(ifft(np.conjugate(X) * Y))
+    
+    # Find peak index for time shift
+    time_shift = np.argmax(autocorr)
+
+    # Correct cyclic shift
+    if time_shift > N // 2:
+        time_shift -= N
+
+    # Align arrays
+    if time_shift > 0:
+        aligned_source = source[:-time_shift]
+        aligned_processed = processed[time_shift:]
+        aligned_demodulated = demodulated[time_shift:]
+    elif time_shift < 0:
+        aligned_source = source[-time_shift:]
+        aligned_processed = processed[:time_shift]
+        aligned_demodulated = demodulated[:time_shift]
+    else:
+        aligned_source = source
+        aligned_processed = processed
+        aligned_demodulated = demodulated
+
+    # Ensure equal length
+    min_length = min(len(aligned_source), len(aligned_processed))
+
+    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length]
+
+
+def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols):
+    source_symbols0, processed_symbols0, demodulated_symbols0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0])
+    source_symbols1, processed_symbols1, demodulated_symbols1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1])
+
+    final_len = min(len(source_symbols0), len(source_symbols1))
+
+    source_symbols = np.array([source_symbols0[:final_len], source_symbols1[:final_len]])
+    processed_symbols = np.array([processed_symbols0[:final_len], processed_symbols1[:final_len]])
+    demodulated_symbols = np.array([demodulated_symbols0[:final_len], demodulated_symbols1[:final_len]])
+
+    return source_symbols, processed_symbols, demodulated_symbols

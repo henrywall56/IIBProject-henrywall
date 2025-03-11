@@ -23,33 +23,9 @@ if(p.lab_testing==False):
     channel_output = channel.channel(pulse_shaped_symbols)
 
     demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output)
-
-    plot_autocorr = True
-    if(plot_autocorr==True):
-        if(p.Mod_param.NPol==1):
-            autocorr = np.real(ifft(np.conjugate(fft(source_symbols))*fft(processed_symbols)))
-            plt.figure()
-            plt.plot(autocorr)
-            plt.title('autocorrelation')
-            print('Max autocorrelation at index', np.argmax(autocorr), 'or', np.argmax(autocorr)-p.Mod_param.num_symbols)
-
-        else:
-            autocorrV = np.real(ifft(np.conjugate(fft(source_symbols[0]))*fft(processed_symbols[0])))
-            autocorrH = np.real(ifft(np.conjugate(fft(source_symbols[1]))*fft(processed_symbols[1])))
-
-            plt.figure()
-            plt.plot(autocorrV)
-            plt.title('V autocorrelation')
-            print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-            plt.figure()    
-            plt.plot(autocorrH)
-            plt.title('H autocorrelation')
-            print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-
-    source_symbols = np.array([source_symbols[0][:-np.argmax(autocorrV)], source_symbols[1][:-np.argmax(autocorrH)]])
-    processed_symbols = np.array([processed_symbols[0][np.argmax(autocorrV):], processed_symbols[1][np.argmax(autocorrH):]])
-    demodulated_symbols = np.array([demodulated_symbols[0][np.argmax(autocorrV):], demodulated_symbols[1][np.argmax(autocorrH):]])
     
+    # source_symbols, processed_symbols, demodulated_symbols = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols)
+
     BER, AIR, AIR_theoretical = pe.performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols)
 
     print('BER:', BER)
@@ -102,7 +78,7 @@ else: #processing channel output
     #     original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
     #     original_bits = np.array([original_bits0,original_bits1])
 
-    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"rx_trace_QPSK50G_2Pol"))
+    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"rx_trace_16QAM50G"))
     if(p.Mod_param.NPol==1):
         channel_output = np.array(channel_output_dict["X_payload"].squeeze())
         channel_output = channel_output[2048:]
@@ -126,6 +102,13 @@ else: #processing channel output
         #only plot those not discarded after adaptive equalisation
         f.plot_constellation(axs[0], processed_symbols[0][p.AE_param.Ndiscard:], title='processed V', lim=2)
         f.plot_constellation(axs[1], processed_symbols[1][p.AE_param.Ndiscard:], title='processed H', lim=2)
+
+    pol0 = channel_output[0]
+
+    snr = np.sum(np.abs(pol0)**2)/len(pol0)
+
+
+
 
 plt.show()
 

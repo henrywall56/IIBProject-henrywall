@@ -92,7 +92,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 2,
+        Modbits = 4,
         Rs = 50e9,
         NPol = 2,
         num_power = 15
@@ -127,7 +127,7 @@ toggle = toggleX(
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
         toggle_DE = False,
-        toggle_frequencyrecovery = True,
+        toggle_frequencyrecovery = False,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
@@ -156,15 +156,15 @@ CD_param = CD_paramX(fibre_param.D, fibre_param.Clambda, Mod_param.Rs, fibre_par
 AE_param = AE_paramX(
         NTaps = 11,
         mu = 1e-3,
-        N1 = 4000,
+        N1 = 5000,
         N2 = 8000,
         Ndiscard = 10000,
-        AE_type = "4x4"
+        AE_type = "2x2"
 )
 
 BPS_param = BPS_paramX(
-        B = 64,
-        N = 20
+        B = 32,
+        N = 6
 )
 
 PAS_param = PAS_paramX(
@@ -172,7 +172,7 @@ PAS_param = PAS_paramX(
         λ = 0.05
 )
 
-lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
+lab_testing = False #If true, then lab_testing.py set to save bits and source symbols
                    #If true, then transceiver loads in real channel output data
 save_run = False
-run = 3
+run = 4
