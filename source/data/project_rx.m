@@ -1,7 +1,7 @@
 %% Load the waveforms
 close all;
 clc;
-tic;
+% tic;
 measurement_index = 1;
 X_I = Signal_X_I(:,measurement_index);
 X_Q = Signal_X_Q(:,measurement_index);
@@ -55,4 +55,7 @@ scatterplot(X_2sps_rrc);
 scatterplot(Y_2sps_rrc);
 %% Timing Sync
 [X_payload,X_header,X_pos] = Rx_Syncronisation(X_2sps_rrc,Sync_PN_X);
-% [Y_payload,Y_header,Y_pos] = Rx_Syncronisation(Y_2sps_rrc,Sync_PN_Y);
+[Y_payload,Y_header,Y_pos] = Rx_Syncronisation(Y_2sps_rrc,Sync_PN_Y);
+
+% save('payload_data.mat', 'X_payload', 'Y_payload');
+save('QPSK_1Pol_1402_rx.mat', 'X_payload');

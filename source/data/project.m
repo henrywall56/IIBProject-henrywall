@@ -1,11 +1,11 @@
-clear;close all;clc;
-warning off;
-addpath SOA\Matlab\
-addpath SOA\Matlab\lib
-addpath SOA\Matlab\Traces\
+% clear;close all;clc;
+% warning off;
+% addpath SOA\Matlab\
+% addpath SOA\Matlab\lib
+% addpath SOA\Matlab\Traces\
 %%
-Mqam = 16;
-Nsym = 32768; %; % 131072
+Mqam = 4;
+Nsym = 131072;
 Nbit = Nsym*log2(Mqam);
 Sps = 2;
 pre_len = 2;
@@ -59,7 +59,7 @@ FrameY = [0.9*NormAmp*Sync_header;0.80*TS;pattern_y];
 fff = linspace(-1,1,length(FrameY));
 figure;plot(fff,10*log10(fftshift(abs(fft(FrameY)))))
 
-%% Apply Pre-emphasisi filtering and RRC Pulse Shaping
+%% Apply Pre-emphasis filtering and RRC Pulse Shaping
 load("CH4_pred.mat");
 f1 = zeros(125,1);
 filt_r = pred(1:125);
@@ -174,8 +174,8 @@ function [SyncHead,Sync_PN_saved] = SyncHeaderGenerator(Nbit,prbs,shift)
 end
 
 %% 
-
-X = X_I + 1i*X_Q;
-scatterplot(X);
-Y = Y_I + 1i*Y_Q;
-scatterplot(Y);
+% 
+% X = X_I + 1i*X_Q;
+% scatterplot(X);
+% Y = Y_I + 1i*Y_Q;
+% scatterplot(Y);

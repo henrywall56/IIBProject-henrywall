@@ -28,6 +28,8 @@ def generate_original_bits(num_symbols, Modbits, NPol):
     #If NPol == 1: generate 1D array of bits
     #If NPol == 2: generate 2D array of bits
     #bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
+    np.random.seed(1)
+
     bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
 
     if(NPol==2):
@@ -1163,7 +1165,7 @@ def frequency_recovery(y, Rs, NPol, toggle_frequencyrecovery):
             k = np.arange(len(y))
             z = y*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
             
-            print(f'Delta_f from frequency recovery: {Delta_f}Hz')
+            print(f'Delta_f from frequency recovery: {Delta_f/1e9}GHz')
             return z
         elif(NPol==2):
             f = np.arange(-1/2 + 1/len(y[0]), 1/2, 1/len(y[0]))*Rs

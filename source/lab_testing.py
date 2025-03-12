@@ -22,9 +22,15 @@ if(p.lab_testing==True and p.save_run==True):
     original_bits_save_dir = os.path.join(script_dir, f"data/original_bits/{run}_{timestamp}")
     source_symbols_save_dir = os.path.join(script_dir, f"data/source_symbols/{run}_{timestamp}")
     channel_output_symbols_save_dir = os.path.join(script_dir, f"data/channel_output/{run}_{timestamp}")
+    matlab_objects_save_dir = os.path.join(script_dir, f"data/matlab_objects/{run}_{timestamp}")
+    raw_rx_save_dir = os.path.join(script_dir, f"data/raw_rx/{run}_{timestamp}")
+
     os.makedirs(original_bits_save_dir, exist_ok=True)
     os.makedirs(source_symbols_save_dir, exist_ok=True)
     os.makedirs(channel_output_symbols_save_dir, exist_ok=True)
+    os.makedirs(matlab_objects_save_dir, exist_ok=True)
+    os.makedirs(raw_rx_save_dir, exist_ok=True)
+ 
  
     #  SAVING ORIGINAL BITS
     if(p.Mod_param.NPol==1):

@@ -395,9 +395,6 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
     elif(p.Mod_param.Modbits==6):
         source_symbols = source_symbols/np.sqrt(42)
 
-    print(processed_symbols[0])
-    print(source_symbols[0])
-
     if(p.Mod_param.NPol==1):
         BER = np.mean(original_bits != demodulated_bits)
         if(p.toggle.toggle_AIR==True):

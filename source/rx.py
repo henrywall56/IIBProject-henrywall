@@ -11,11 +11,11 @@ def rx(rx):
 
     if(p.lab_testing==False):
         filtered_signal = f.matched_filter(rx, p.RRC_param.RRCimpulse, NPol, toggle=p.toggle.toggle_RRC) #if toggle is False, this function returns input
+        ADC = f.downsample(filtered_signal, p.RRC_param.sps//2, NPol, toggle=p.toggle.toggle_RRC) #Simulate ADC downsampling to 2 sps
     else:
         filtered_signal = rx
+        ADC = filtered_signal #at 2 sps
 
-    ADC = f.downsample(filtered_signal, p.RRC_param.sps//2, NPol, toggle=p.toggle.toggle_RRC) #Simulate ADC downsampling to 2 sps
-    
     #Chromatic Dispersion Compensation
     if(p.toggle.toggle_RRC==True):
         spsCD = 2
