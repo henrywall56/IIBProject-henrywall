@@ -88,6 +88,8 @@ else: #processing channel output
     script_dir = os.path.dirname(os.path.abspath(__file__))
     channel_output_save_dir = os.path.join(script_dir, f"data/channel_output/{run}")
     original_bits_save_dir = os.path.join(script_dir, f"data/original_bits/{run}")
+    source_symbols_save_dir = os.path.join(script_dir, f"data/source_symbols/QPSK_1Pol_1402")
+
 
 
     # if(p.Mod_param.NPol==1):
@@ -97,17 +99,22 @@ else: #processing channel output
     #     original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
     #     original_bits = np.array([original_bits0,original_bits1])
 
-    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"QPSK_1Pol_1402_rx"))
+    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"QPSK_2Pol_1402_rx"))
+
+    source_symbols_dict = scipy.io.loadmat(os.path.join(source_symbols_save_dir, f"source_symbols_QPSK_1Pol_1402"))
 
     if(p.Mod_param.NPol==1):
         channel_output = np.array(channel_output_dict["X_payload"].squeeze())
         channel_output = channel_output[2048+1024:]
+        source_symbols = np.array(source_symbols_dict[0,:].squeeze())
     else:
         channel_output0 = channel_output_dict["X_payload"].squeeze()
         channel_output1 = channel_output_dict["Y_payload"].squeeze()
         channel_output0 = channel_output0[2048+1024:]
         channel_output1 = channel_output1[2048+1024:] 
         channel_output = np.array([channel_output0, channel_output1])
+        source_symbols = np.array([source_symbols_dict["source"][0][512:].squeeze(),source_symbols_dict["source"][1][512:].squeeze()])
+   
 
     print('####### EXPERIMENTAL CHANNEL OUTPUT SYMBOLS LOADED #######')
 
@@ -123,10 +130,16 @@ else: #processing channel output
         f.plot_constellation(axs[0], processed_symbols[0][p.AE_param.Ndiscard:], title='processed V', lim=2)
         f.plot_constellation(axs[1], processed_symbols[1][p.AE_param.Ndiscard:], title='processed H', lim=2)
 
-    pol0 = channel_output[0]
-
-    # snr = np.sum(np.abs(pol0)**2)/len(pol0)
-
+    autocorrV = np.real(ifft(np.conjugate(fft(source_symbols[0]))*fft(processed_symbols[0])))
+    autocorrH = np.real(ifft(np.conjugate(fft(source_symbols[1]))*fft(processed_symbols[1])))
+    plt.figure()
+    plt.plot(autocorrV)
+    plt.title('V autocorrelation')
+    print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
+    plt.figure()    
+    plt.plot(autocorrH)
+    plt.title('H autocorrelation')
+    print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
 
 
 

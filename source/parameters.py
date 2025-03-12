@@ -94,7 +94,7 @@ class PAS_paramX:
 Mod_param = Modulation_paramX(
         Modbits = 2,
         Rs = 50e9,
-        NPol = 1,
+        NPol = 2,
         num_power = 17
 )
 
@@ -132,7 +132,7 @@ toggle = toggleX(
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = False,    
+        toggle_adaptive_equalisation = True,    
         toggle_PAS = False,
         AIR_type = 'MI'
 )
@@ -174,5 +174,5 @@ PAS_param = PAS_paramX(
 
 lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
                    #If true, then transceiver loads in real channel output data
-save_run = False
-run = "QPSK_1Pol_1402"
+save_run = True
+run = "QPSK"
