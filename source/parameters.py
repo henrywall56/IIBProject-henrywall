@@ -92,7 +92,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 2,
+        Modbits = 4,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -154,8 +154,8 @@ laser_param = laser_paramX(
 CD_param = CD_paramX(fibre_param.D, fibre_param.Clambda, Mod_param.Rs, fibre_param.L)
 
 AE_param = AE_paramX(
-        NTaps = 11,
-        mu = 1e-3,
+        NTaps = 21,
+        mu = 1e-4,
         N1 = 5000,
         N2 = 8000,
         Ndiscard = 10000,
@@ -174,5 +174,5 @@ PAS_param = PAS_paramX(
 
 lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
                    #If true, then transceiver loads in real channel output data
-save_run = True
-run = "QPSK"
+save_run = False
+run = "16QAM_1657"

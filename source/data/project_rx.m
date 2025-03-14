@@ -57,5 +57,5 @@ scatterplot(Y_2sps_rrc);
 [X_payload,X_header,X_pos] = Rx_Syncronisation(X_2sps_rrc,Sync_PN_X);
 [Y_payload,Y_header,Y_pos] = Rx_Syncronisation(Y_2sps_rrc,Sync_PN_Y);
 
-save('QPSK_2Pol_1402_rx.mat', 'X_payload', 'Y_payload');
-% save('QPSK_2Pol_1402_rx.mat', 'X_payload');
+% save('16QAM_2Pol_1657_rx.mat', 'X_payload', 'Y_payload');
+save('16QAM_1Pol_1615_rx.mat', 'X_payload');

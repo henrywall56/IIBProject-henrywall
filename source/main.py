@@ -37,7 +37,7 @@ def main():
     num_power = 15
     num_symbols = 2**num_power #Number of symbols in each polarisation
                                #Overwritten if PAS used
-    Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
 
     NPol = 2 #Number of polarisations used
     
@@ -106,7 +106,7 @@ def main():
     toggle_AIR = True
     toggle_adaptive_equalisation = True
     AIR_type = 'MI' #'MI' or 'GMI'
-    toggle_PAS = False
+    toggle_PAS = True
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC

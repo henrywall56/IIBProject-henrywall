@@ -5,7 +5,7 @@ import PAS.PAS_architecture as pas
 import DDPhaseRecoveryTesting as dd
 import parameters as p
 
-def rx(rx):
+def rx(rx, source_symbols):
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
 
@@ -39,10 +39,19 @@ def rx(rx):
             print('CMA to RDE switch at:   ', p.AE_param.N2)
             print('Samples discarded:      ', p.AE_param.Ndiscard)
             print('--------------------------------------')
+
+            #2 sps in
             adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, flag, p.AE_param.NTaps, p.AE_param.mu, True, p.AE_param.N1, p.AE_param.N2)
+            #1sps out
+
+            
+            if(True):
+                adaptive_eq_rx0 = f.real_valued_2x2_AEQ(adaptive_eq_rx[0], p.AE_param.mu, p.AE_param.NTaps, source_symbols[0]) #testing for 16-QAM only
+                adaptive_eq_rx1 = f.real_valued_2x2_AEQ(adaptive_eq_rx[1], p.AE_param.mu, p.AE_param.NTaps, source_symbols[1]) #testing for 16-QAM only
+                adaptive_eq_rx = np.array([adaptive_eq_rx0,adaptive_eq_rx1])
+
             downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
             downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:p.AE_param.Ndiscard], adaptive_eq_rx[:, p.AE_param.Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
-
             
         elif(p.AE_param.AE_type=="4x4"):
             adaptive_eq_rx = f.AE_4x4(CD_compensated_rx,p.AE_param.mu,p.AE_param.NTaps, p.Mod_param.Modbits)
@@ -73,6 +82,10 @@ def rx(rx):
         print('Averaging number: ', p.BPS_param.N)
         print('--------------------------------------')
         Phase_Noise_compensated_rx, thetaHat = f.BPS(frequency_recovered, Modbits, p.BPS_param.N, p.BPS_param.B, NPol, p.toggle.toggle_phasenoisecompensation)
+        if(p.toggle.toggle_phasenoisecompensation):
+            plt.figure()
+            plt.plot(thetaHat, color='blue')
+        
     else:
         #Note DD algorithm currently only set up for NPol==1
         #Note this DD algorithm currently uses SNR per bit, which should be changed to per symbol

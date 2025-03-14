@@ -23,7 +23,7 @@ if(p.lab_testing==False):
 
     channel_output = channel.channel(pulse_shaped_symbols)
 
-    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output)
+    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, source_symbols/np.sqrt(10))
 
     plot_autocorr = True
     if(plot_autocorr==True):
@@ -87,10 +87,8 @@ else: #processing channel output
     run = p.run
     script_dir = os.path.dirname(os.path.abspath(__file__))
     channel_output_save_dir = os.path.join(script_dir, f"data/channel_output/{run}")
-    original_bits_save_dir = os.path.join(script_dir, f"data/original_bits/{run}")
-    source_symbols_save_dir = os.path.join(script_dir, f"data/source_symbols/QPSK_1Pol_1402")
-
-
+    # original_bits_save_dir = os.path.join(script_dir, f"data/original_bits/{run}")
+    matlab_objects_save_dir = os.path.join(script_dir, f"data/matlab_objects/{run}")
 
     # if(p.Mod_param.NPol==1):
     #     original_bits = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"))
@@ -99,26 +97,33 @@ else: #processing channel output
     #     original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
     #     original_bits = np.array([original_bits0,original_bits1])
 
-    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"QPSK_2Pol_1402_rx"))
+    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"16QAM_2Pol_1657_rx"))
 
-    source_symbols_dict = scipy.io.loadmat(os.path.join(source_symbols_save_dir, f"source_symbols_QPSK_1Pol_1402"))
+    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"16QAM_1657.mat"))
 
     if(p.Mod_param.NPol==1):
         channel_output = np.array(channel_output_dict["X_payload"].squeeze())
-        channel_output = channel_output[2048+1024:]
-        source_symbols = np.array(source_symbols_dict[0,:].squeeze())
+        channel_output = channel_output[2048:]
+        nopremphasis_source_symbols = np.array(matlab_objects_dict["SignalX_nopre"].squeeze())
     else:
         channel_output0 = channel_output_dict["X_payload"].squeeze()
         channel_output1 = channel_output_dict["Y_payload"].squeeze()
-        channel_output0 = channel_output0[2048+1024:]
-        channel_output1 = channel_output1[2048+1024:] 
+        channel_output0 = channel_output0[2048:]
+        channel_output1 = channel_output1[2048:] 
         channel_output = np.array([channel_output0, channel_output1])
-        source_symbols = np.array([source_symbols_dict["source"][0][512:].squeeze(),source_symbols_dict["source"][1][512:].squeeze()])
-   
+        nopremphasis_source_symbols = np.array([matlab_objects_dict["SignalX_nopre"][::2].squeeze(),matlab_objects_dict["SignalY_nopre"][::2].squeeze()])
+    
+    fig5, axs5 = plt.subplots(1,2, figsize=(15,6.5))
+    #only plot those not discarded after adaptive equalisation
+    nopremphasis_source_symbols0 = nopremphasis_source_symbols[0]/(np.mean(np.abs(nopremphasis_source_symbols[0])**2))
+    nopremphasis_source_symbols1 = nopremphasis_source_symbols[1]/(np.mean(np.abs(nopremphasis_source_symbols[1])**2))
+    nopremphasis_source_symbols = np.array([nopremphasis_source_symbols0, nopremphasis_source_symbols1])
 
+    f.plot_constellation(axs5[0], nopremphasis_source_symbols[0], title='source symbols', lim=2)
+    
     print('####### EXPERIMENTAL CHANNEL OUTPUT SYMBOLS LOADED #######')
 
-    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output)
+    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, nopremphasis_source_symbols)
 
     if(p.Mod_param.NPol==1):
         fig, axs = plt.subplots(1, 1, figsize=(8, 8))
@@ -129,18 +134,6 @@ else: #processing channel output
         #only plot those not discarded after adaptive equalisation
         f.plot_constellation(axs[0], processed_symbols[0][p.AE_param.Ndiscard:], title='processed V', lim=2)
         f.plot_constellation(axs[1], processed_symbols[1][p.AE_param.Ndiscard:], title='processed H', lim=2)
-
-    autocorrV = np.real(ifft(np.conjugate(fft(source_symbols[0]))*fft(processed_symbols[0])))
-    autocorrH = np.real(ifft(np.conjugate(fft(source_symbols[1]))*fft(processed_symbols[1])))
-    plt.figure()
-    plt.plot(autocorrV)
-    plt.title('V autocorrelation')
-    print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-    plt.figure()    
-    plt.plot(autocorrH)
-    plt.title('H autocorrelation')
-    print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-
 
 
 plt.show()
