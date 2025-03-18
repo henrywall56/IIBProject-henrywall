@@ -32,6 +32,9 @@ def tx(original_bits):
     elif(Modbits==6):
         B=64 #Number of trial angles
         modulation_format='64-QAM'
+    elif(Modbits==8):
+        B=64 #Number of trial angles
+        modulation_format='256-QAM'
 
     L = p.fibre_param.L
 

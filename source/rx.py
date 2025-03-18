@@ -44,12 +44,6 @@ def rx(rx, source_symbols):
             adaptive_eq_rx = f.adaptive_equalisation(CD_compensated_rx ,2, flag, p.AE_param.NTaps, p.AE_param.mu, True, p.AE_param.N1, p.AE_param.N2)
             #1sps out
 
-            
-            if(True):
-                adaptive_eq_rx0 = f.real_valued_2x2_AEQ(adaptive_eq_rx[0], p.AE_param.mu, p.AE_param.NTaps, source_symbols[0]) #testing for 16-QAM only
-                adaptive_eq_rx1 = f.real_valued_2x2_AEQ(adaptive_eq_rx[1], p.AE_param.mu, p.AE_param.NTaps, source_symbols[1]) #testing for 16-QAM only
-                adaptive_eq_rx = np.array([adaptive_eq_rx0,adaptive_eq_rx1])
-
             downsampled_CD_compensated_rx = f.downsample(CD_compensated_rx, 2, NPol, True)
             downsampled_rx = np.concatenate([downsampled_CD_compensated_rx[:,:p.AE_param.Ndiscard], adaptive_eq_rx[:, p.AE_param.Ndiscard:]], axis=1) #Discard first NOut symbols of adaptive equalisation
             
@@ -85,6 +79,12 @@ def rx(rx, source_symbols):
         if(p.toggle.toggle_phasenoisecompensation):
             plt.figure()
             plt.plot(thetaHat, color='blue')
+
+        # Testing real valued AEQ
+        # if(p.Mod_param.Modbits==4): 
+        #     real_adaptive_eq_rx0 = f.real_valued_2x2_AEQ(adaptive_eq_rx[0], p.AE_param.mu, p.AE_param.NTaps, source_symbols[0]) #testing for 16-QAM only
+        #     real_adaptive_eq_rx1 = f.real_valued_2x2_AEQ(adaptive_eq_rx[1], p.AE_param.mu, p.AE_param.NTaps, source_symbols[1]) #testing for 16-QAM only
+        #     Phase_Noise_compensated_rx = np.array([real_adaptive_eq_rx0,real_adaptive_eq_rx1])
         
     else:
         #Note DD algorithm currently only set up for NPol==1

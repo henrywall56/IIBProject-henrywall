@@ -32,12 +32,14 @@ plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
 11) Generate BER.
 
 """
+
+#Use transceiver.py now, note source symbols are no longer normalised, but this file assumes that they are
 def main():
     
     num_power = 15
     num_symbols = 2**num_power #Number of symbols in each polarisation
                                #Overwritten if PAS used
-    Modbits = 6 #2 is QPSK, 4 is 16QAM, 6 is 64QAM
+    Modbits = 8 #2 is QPSK, 4 is 16QAM, 6 is 64QAM, 8 is 256QAM
 
     NPol = 2 #Number of polarisations used
     
@@ -72,6 +74,10 @@ def main():
         B=64 #Number of trial angles
         plotsize = 3
         modulation_format='64-QAM'
+    elif(Modbits==8):
+        B=64 #Number of trial angles
+        plotsize = 6
+        modulation_format='256-QAM'
 
     Rs = 100e9 #Rs symbol rate symbols/second (Baud)
 
@@ -104,9 +110,9 @@ def main():
     toggle_NL = False
     toggle_CD_compensation = False #Toggle Chromatic Dispersion Compensation
     toggle_AIR = True
-    toggle_adaptive_equalisation = True
+    toggle_adaptive_equalisation = False
     AIR_type = 'MI' #'MI' or 'GMI'
-    toggle_PAS = True
+    toggle_PAS = False
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC

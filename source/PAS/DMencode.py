@@ -13,11 +13,13 @@ def nCr(n, r):
 def DMencode(C, v, k,blocks):
     # Distribution Matcher using arithmetic coding
 
-    # C = {nA, nB, nC, nD} #composition (for 64-QAM, number of 1's, 3's, 5's and 7's in each block)
+    # C = {nA, nB, nC, nD, nE, nF, nG, nH} #composition (for 64-QAM, number of 1's, 3's, 5's and 7's in each block)
     # k = number of bits in input block
 
     # v #input bits
     # x #output symbols
+
+    print(C)
     v = v.reshape((blocks,k))
     N = np.sum(C)
     x = np.zeros((blocks,N),dtype=int)
@@ -28,6 +30,10 @@ def DMencode(C, v, k,blocks):
         nB = C[1]
         nC = C[2]
         nD = C[3]
+        nE = C[4]
+        nF = C[5]
+        nG = C[6]
+        nH = C[7]
         
         ui = 1.0 #input interval upper
         bi = 0.0 #input interval base
@@ -37,10 +43,20 @@ def DMencode(C, v, k,blocks):
         m1 = (nA/(N-h))*(uc-bc)+bc
         m2 = ((nA+nB)/(N-h))*(uc-bc) + bc
         m3 = ((nA+nB+nC)/(N-h))*(uc-bc) + bc
+        m4 = ((nA+nB+nC+nD)/(N-h))*(uc-bc) + bc
+        m5 = ((nA+nB+nC+nD+nE)/(N-h))*(uc-bc) + bc
+        m6 = ((nA+nB+nC+nD+nE+nF)/(N-h))*(uc-bc) + bc
+        m7 = ((nA+nB+nC+nD+nE+nF+nG)/(N-h))*(uc-bc) + bc
 
-        if(nC==0 and nD==0):
+        if(nC==0 and nD==0 and nE==0 and nF==0 and nG==0 and nH==0):
             m2 = 1.0
             m3 = 1.0
+
+        if(nE==0 and nF==0 and nG==0 and nH==0):
+            m4=1.0
+            m5=1.0
+            m6=1.0
+            m7=1.0
         
         code_intervals = IntervalTree()
         if(nA!=0):
@@ -50,7 +66,15 @@ def DMencode(C, v, k,blocks):
         if(nC!=0):
             code_intervals.addi(m2, m3, int(5))
         if(nD!=0):
-            code_intervals.addi(m3, uc, int(7))
+            code_intervals.addi(m3, m4, int(7))
+        if(nE!=0):
+            code_intervals.addi(m4, m5, int(9))
+        if(nF!=0):
+            code_intervals.addi(m5, m6, int(11))
+        if(nG!=0):
+            code_intervals.addi(m6, m7, int(13))
+        if(nH!=0):
+            code_intervals.addi(m7, uc, int(15))
 
         source_interval = Interval(0,1)
 
@@ -94,15 +118,34 @@ def DMencode(C, v, k,blocks):
                     nC=nC-1
                 elif(latest_symbol==7): 
                     nD=nD-1
+                elif(latest_symbol==9): 
+                    nE=nE-1
+                elif(latest_symbol==11): 
+                    nF=nF-1
+                elif(latest_symbol==13): 
+                    nG=nG-1
+                elif(latest_symbol==15): 
+                    nH=nH-1
+
                 bc = 0.0 #code interval base
                 uc = 1.0 #code interval upper
                 m1 = (nA/(N-h))*(uc-bc)+bc
                 m2 = ((nA+nB)/(N-h))*(uc-bc) + bc
                 m3 = ((nA+nB+nC)/(N-h))*(uc-bc) + bc
+                m4 = ((nA+nB+nC+nD)/(N-h))*(uc-bc) + bc
+                m5 = ((nA+nB+nC+nD+nE)/(N-h))*(uc-bc) + bc
+                m6 = ((nA+nB+nC+nD+nE+nF)/(N-h))*(uc-bc) + bc
+                m7 = ((nA+nB+nC+nD+nE+nF+nG)/(N-h))*(uc-bc) + bc
 
-                if(nC==0 and nD==0):
+                if(nC==0 and nD==0 and nE==0 and nF==0 and nG==0 and nH==0):
                     m2 = 1.0
                     m3 = 1.0
+
+                if(nE==0 and nF==0 and nG==0 and nH==0):
+                    m4=1.0
+                    m5=1.0
+                    m6=1.0
+                    m7=1.0
                 
                 # symbols = correct_code_interval.data.copy()
                 # symbols.append(int(latest_symbol))
@@ -114,7 +157,15 @@ def DMencode(C, v, k,blocks):
                 if(nC!=0):
                     code_intervals.addi(m2, m3, int(5))
                 if(nD!=0):
-                    code_intervals.addi(m3, uc, int(7))   
+                    code_intervals.addi(m3, m4, int(7))   
+                if(nE!=0):
+                    code_intervals.addi(m4, m5, int(9))   
+                if(nF!=0):
+                    code_intervals.addi(m5, m6, int(11))   
+                if(nG!=0):
+                    code_intervals.addi(m6, m7, int(13))   
+                if(nH!=0):
+                    code_intervals.addi(m7, uc, int(15))   
 
                 symbol_identified = False
 
@@ -128,10 +179,20 @@ def DMencode(C, v, k,blocks):
         m1 = (nA/(N-h))*(uc-bc)+bc
         m2 = ((nA+nB)/(N-h))*(uc-bc)+bc
         m3 = ((nA+nB+nC)/(N-h))*(uc-bc)+bc
+        m4 = ((nA+nB+nC+nD)/(N-h))*(uc-bc) + bc
+        m5 = ((nA+nB+nC+nD+nE)/(N-h))*(uc-bc) + bc
+        m6 = ((nA+nB+nC+nD+nE+nF)/(N-h))*(uc-bc) + bc
+        m7 = ((nA+nB+nC+nD+nE+nF+nG)/(N-h))*(uc-bc) + bc
 
-        if(nC==0 and nD==0):
+        if(nC==0 and nD==0 and nE==0 and nF==0 and nG==0 and nH==0):
             m2 = 1.0
             m3 = 1.0
+        
+        if(nE==0 and nF==0 and nG==0 and nH==0):
+            m4=1.0
+            m5=1.0
+            m6=1.0
+            m7=1.0
 
         code_intervals.clear()
         code_intervals = IntervalTree()
@@ -142,7 +203,15 @@ def DMencode(C, v, k,blocks):
         if(nC!=0):
             code_intervals.addi(m2, m3, int(5))
         if(nD!=0):
-            code_intervals.addi(m3, uc, int(7))
+            code_intervals.addi(m3, m4, int(7))
+        if(nE!=0):
+            code_intervals.addi(m4, m5, int(9))   
+        if(nF!=0):
+            code_intervals.addi(m5, m6, int(11))   
+        if(nG!=0):
+            code_intervals.addi(m6, m7, int(13))   
+        if(nH!=0):
+            code_intervals.addi(m7, uc, int(15))  
         
         finalised = False
         for iv in code_intervals:
@@ -166,6 +235,15 @@ def DMencode(C, v, k,blocks):
             nC=nC-1
         elif(latest_symbol==7): 
             nD=nD-1
+        elif(latest_symbol==9): 
+            nE=nE-1
+        elif(latest_symbol==11): 
+            nF=nF-1
+        elif(latest_symbol==13): 
+            nG=nG-1
+        elif(latest_symbol==15): 
+            nH=nH-1
+        
 
         for i in range(nA):
             x[row][h] = int(1)
@@ -178,6 +256,18 @@ def DMencode(C, v, k,blocks):
             h = h+1
         for i in range(nD):
             x[row][h] = int(7)
+            h = h+1
+        for i in range(nE):
+            x[row][h] = int(9)
+            h = h+1
+        for i in range(nF):
+            x[row][h] = int(11)
+            h = h+1
+        for i in range(nG):
+            x[row][h] = int(13)
+            h = h+1
+        for i in range(nH):
+            x[row][h] = int(15)
             h = h+1
 
     return x.flatten()  

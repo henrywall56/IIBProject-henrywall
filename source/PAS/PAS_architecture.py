@@ -49,7 +49,7 @@ def PAS_signs(A, Modbits, LDPC_encoder):
     #NPol: Number of polarisations
 
     if(Modbits==4): #16-QAM (2**m ASK constellation, m=2, so 2**(m-1)=2 amplitudes)
-        #G = [I|P] systemartic generator matrix
+        #G = [I|P] systematic generator matrix
         #P is a ((m-1)N),(N) = (N,N) matrix
         #A[i] is length-N vector
         #b_A[i] is a length N(m-1) = N vector
@@ -99,6 +99,65 @@ def PAS_signs(A, Modbits, LDPC_encoder):
         X = np.empty((A.shape[0],A.shape[1]), dtype=int)
         for i in range(b_A.shape[0]): #For each block
             #b_S[i] = np.dot(b_A[i],P)
+            b_S[i] = LDPC_encoder.encode(b_A[i])[LDPC_encoder.K:]
+
+            #b_S[i] = np.random.choice([0,1], size=A.shape[1], p=[0.5,0.5]) #Overwriting for testing with actual uniform distributed signs
+
+            S[i] = np.where(b_S[i]==0, 1, -1)
+            X[i] = A[i]*S[i]
+        
+        return X
+    elif(Modbits==8): #256-QAM (2**m ASK constellation, m=4, so 2**(m-1)=8 amplitudes)
+        m=4
+        n_P = A.shape[1]*m
+        k_P = A.shape[1]*(m-1)
+
+        b_A = []
+        for row in range(A.shape[0]):
+            b_A_row = []
+            for i in A[row]:
+                if(i==1):
+                    b_A_row.append(1)
+                    b_A_row.append(0)
+                    b_A_row.append(0)
+                if(i==3):
+                    b_A_row.append(1)
+                    b_A_row.append(0)
+                    b_A_row.append(1)
+                if(i==5):
+                    b_A_row.append(1)
+                    b_A_row.append(1)
+                    b_A_row.append(1)
+                if(i==7):
+                    b_A_row.append(1)
+                    b_A_row.append(1)
+                    b_A_row.append(0)
+                if(i==9):
+                    b_A_row.append(0)
+                    b_A_row.append(1)
+                    b_A_row.append(0)
+                if(i==11):
+                    b_A_row.append(0)
+                    b_A_row.append(1)
+                    b_A_row.append(1)
+                if(i==13):
+                    b_A_row.append(0)
+                    b_A_row.append(0)
+                    b_A_row.append(1)
+                if(i==15):
+                    b_A_row.append(0)
+                    b_A_row.append(0)
+                    b_A_row.append(0)
+
+            b_A.append(b_A_row)
+        
+        b_A = np.array(b_A)
+        b_S = np.empty((A.shape[0],A.shape[1]), dtype=int) #Bits representing sign blocks
+        S = np.empty((A.shape[0],A.shape[1]), dtype=int) #Sign blocks
+        X = np.empty((A.shape[0],A.shape[1]), dtype=int)
+        for i in range(b_A.shape[0]): #For each block
+            #b_S[i] = np.dot(b_A[i],P)
+
             b_S[i] = LDPC_encoder.encode(b_A[i])[LDPC_encoder.K:]
 
             #b_S[i] = np.random.choice([0,1], size=A.shape[1], p=[0.5,0.5]) #Overwriting for testing with actual uniform distributed signs
@@ -172,6 +231,48 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
             for llr in LLR_signsi:
                 LLRi.append(llr)
             LLR.append(LLRi)
+        
+    elif(Modbits==8):
+        
+        X_0_0 = np.array([1,3,5,7,9,11,13,15])/np.sqrt(norm) #Set of symbols that have a 0 at the 0th bit level
+        X_0_1 = np.array([-15,-13,-11,-9,-7,-5,-3,-1])/np.sqrt(norm) #Set of symbols that have a 1 at the 0th bit level
+        X_1_0 = np.array([-15,-13,-11,-9,9,11,13,15])/np.sqrt(norm) #Set of symbols that have a 0 at the 1th bit level
+        X_1_1 = np.array([-7,-5,-3,-1,1,3,5,7])/np.sqrt(norm) #Set of symbols that have a 1 at the 1th bit level
+        X_2_0 = np.array([-15,-13,-3,-1,1,3,13,15])/np.sqrt(norm) #Set of symbols that have a 0 at the 2th bit level
+        X_2_1 = np.array([-11,-9,-7,-5,5,7,9,11])/np.sqrt(norm) #Set of symbols that have a 1 at the 2th bit level
+        X_3_0 = np.array([-15,-9,-7,-1,1,7,9,15])/np.sqrt(norm) #Set of symbols that have a 0 at the 3th bit level
+        X_3_1 = np.array([-13,-11,-5,-3,3,5,11,13])/np.sqrt(norm) #Set of symbols that have a 1 at the 3th bit level
+        LLR=[]
+        for i in range(blocks):
+            LLR_ampli = []
+            LLR_signsi = []
+            for y in Y[i]:
+                x0_0 = X_0_0[np.argmax(np.exp(-1*((y-X_0_0)**2/(2*sigma**2))-λ*X_0_0**2))]
+                x0_1 = X_0_1[np.argmax(np.exp(-1*((y-X_0_1)**2/(2*sigma**2))-λ*X_0_1**2))]
+                llr = ((x0_0-x0_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x0_0**2-x0_1**2)
+                LLR_signsi.append(llr)
+
+                x1_0 = X_1_0[np.argmax(np.exp(-1*((y-X_1_0)**2/(2*sigma**2))-λ*X_1_0**2))]
+                x1_1 = X_1_1[np.argmax(np.exp(-1*((y-X_1_1)**2/(2*sigma**2))-λ*X_1_1**2))]
+                llr = ((x1_0-x1_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x1_0**2-x1_1**2)
+                LLR_ampli.append(llr)
+
+                x2_0 = X_2_0[np.argmax(np.exp(-1*((y-X_2_0)**2/(2*sigma**2))-λ*X_2_0**2))]
+                x2_1 = X_2_1[np.argmax(np.exp(-1*((y-X_2_1)**2/(2*sigma**2))-λ*X_2_1**2))]
+                llr = ((x2_0-x2_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x2_0**2-x2_1**2)
+                LLR_ampli.append(llr)
+
+                x3_0 = X_3_0[np.argmax(np.exp(-1*((y-X_3_0)**2/(2*sigma**2))-λ*X_3_0**2))]
+                x3_1 = X_3_1[np.argmax(np.exp(-1*((y-X_3_1)**2/(2*sigma**2))-λ*X_3_1**2))]
+                llr = ((x3_0-x3_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x3_0**2-x3_1**2)
+                LLR_ampli.append(llr)
+
+            LLRi = []
+            for llr in LLR_ampli:
+                LLRi.append(llr)
+            for llr in LLR_signsi:
+                LLRi.append(llr)
+            LLR.append(LLRi)
     
     return np.array(LLR).flatten()
 
@@ -197,6 +298,25 @@ def BRGC_btos(bits, Modbits):
                (0,0,0):5,
                (0,0,1):7
         }
+    
+    elif(Modbits==8):
+        btos_map = {(1,0,0,0): -15,
+                    (1,0,0,1): -13,
+                    (1,0,1,1): -11,
+                    (1,0,1,0): -9,
+                    (1,1,1,0): -7,
+                    (1,1,1,1): -5,
+                    (1,1,0,1): -3,
+                    (1,1,0,0): -1,
+                    (0,1,0,0): 1,
+                    (0,1,0,1): 3,
+                    (0,1,1,1): 5,
+                    (0,1,1,0): 7,
+                    (0,0,1,0): 9,
+                    (0,0,1,1): 11,
+                    (0,0,0,1): 13,
+                    (0,0,0,0): 15
+                    }
     
     symbols = np.array([
         btos_map[tuple(bits[i:i + Modbits//2])] for i in range(0, len(bits), Modbits//2)
@@ -224,6 +344,7 @@ def regroup_LLRs(LLR, Modbits):
             for llr in LLR_regroupedi:
                 LLR_regrouped.append(llr)
         return np.array(LLR_regrouped)
+    
     elif Modbits==6:
         LLR_regrouped = []
         m=3
@@ -242,6 +363,25 @@ def regroup_LLRs(LLR, Modbits):
                 LLR_regrouped.append(llr)
         return np.array(LLR_regrouped)
 
+    elif Modbits==8:
+        LLR_regrouped = []
+        m=4
+        nc = LLR.shape[1]//m
+        for i in range(LLR.shape[0]):
+            sign_LLRs = LLR[i][nc*(m-1):] #LLRs representing sign bits
+            amplitude_LLRs = LLR[i][:nc*(m-1)]
+            j=0
+            LLR_regroupedi = []
+            while(j<(nc*(m-1))):
+                LLR_regroupedi.append(sign_LLRs[j//(m-1)])
+                LLR_regroupedi.append(amplitude_LLRs[j])
+                LLR_regroupedi.append(amplitude_LLRs[j+1])
+                LLR_regroupedi.append(amplitude_LLRs[j+2])
+                j=j+m-1
+            for llr in LLR_regroupedi:
+                LLR_regrouped.append(llr)
+        return np.array(LLR_regrouped)
+
 def PAS_parameters(Modbits,λ):
     if(Modbits==2):
         return 1,1,1,1
@@ -251,7 +391,7 @@ def PAS_parameters(Modbits,λ):
         const = 0
         for i in signal_points:
             const += np.exp(-λ*np.abs(i)**2)
-        C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),0,0]
+        C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),0,0,0,0,0,0]
         N = np.sum(C)
         k = int(np.floor(math.log2(nCr(N,C[1]))))
         LDPC_encoder = ldpc.code(standard = '802.16', rate = '1/2', z=75, ptype='A')
@@ -263,13 +403,29 @@ def PAS_parameters(Modbits,λ):
         const = 0
         for i in signal_points:
             const += np.exp(-λ*np.abs(i)**2)
-        C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),int(N_target*np.exp(-λ*25)/const),int(N_target*np.exp(-λ*49)/const)]
+        C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),int(N_target*np.exp(-λ*25)/const),int(N_target*np.exp(-λ*49)/const),0,0,0,0]
         C[0] += 1 #to get N to 400
         k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])))))
         N = np.sum(C)
         LDPC_encoder = ldpc.code(standard = '802.16', rate = '2/3', z=50, ptype='A')
-        
+        #LDPC encoder rate is (m-1)/m = 2/3
         #LDPC_encoder.K should be (m-1)N = 2N
+
+    elif(Modbits==8):
+        signal_points = [1,3,5,7,9,11,13,15]
+        N_target = 369
+        const = 0
+        #*********************** REMOVE AFTER TESTING ***********************
+        λ=0.015
+        for i in signal_points:
+            const += np.exp(-λ*np.abs(i)**2)
+        C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),int(N_target*np.exp(-λ*25)/const),int(N_target*np.exp(-λ*49)/const), int(N_target*np.exp(-λ*81)/const), int(N_target*np.exp(-λ*121)/const), int(N_target*np.exp(-λ*169)/const), int(N_target*np.exp(-λ*225)/const)]
+        
+        k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3]+C[4]+C[5]+C[6]+C[7])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])*math.factorial(C[4])*math.factorial(C[5])*math.factorial(C[6])*math.factorial(C[7])))))
+        N = np.sum(C)
+        LDPC_encoder = ldpc.code(standard = '802.16', rate = '3/4', z=61, ptype='A')
+        #LDPC encoder rate is (m-1)/m = 3/4
+        #LDPC_encoder.K should be (m-1)N = 3N
 
     return k, N, C, LDPC_encoder
 
@@ -286,6 +442,7 @@ def PAS_decoder(Y, Modbits, λ, sigma, blocks, LDPC_encoder, k, C, norm):
     LLRQ = LLRQ.reshape((blocks,LLRQ.shape[0]//blocks))
     LLR_LDPCI=np.empty(LLRI.shape)
     LLR_LDPCQ=np.empty(LLRQ.shape)
+
 
     for i in range(blocks):
         LLR_LDPCI[i],itI = LDPC_encoder.decode(LLRI[i]) #LDPC decoding to final LLRs
@@ -329,7 +486,7 @@ def PAS_barplot(X):
     ax = fig.add_subplot(111, projection='3d')
 
     # Define bar width
-    bar_width = 0.3
+    bar_width = 0.1
 
     # Plot bars with color-coding
     for x, y, h, color in zip(real_parts, imag_parts, probabilities, colors):
@@ -344,8 +501,8 @@ def PAS_barplot(X):
 
 if(testing==True):
 
-    Modbits = 6
-    blocks = 100
+    Modbits = 8
+    blocks = 1000
     # np.random.seed(2)
     λ = 0.03
 
@@ -375,9 +532,9 @@ if(testing==True):
     print('Blocks:',blocks)
     print('Rate:', 2*k/N, 'bits/symbol')
 
-    print(bits, 'Source Bits')
-    print(X,'CCDM Symbols')
-    print(bits_decoded, 'Decoded Bits')
+    # print(bits, 'Source Bits')
+    # print(X,'CCDM Symbols')
+    # print(bits_decoded, 'Decoded Bits')
 
     if(np.array_equal(bits_decoded,bits)):
         print('No Bit Errors')

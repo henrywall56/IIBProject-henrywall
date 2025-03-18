@@ -23,7 +23,10 @@ if(p.lab_testing==False):
 
     channel_output = channel.channel(pulse_shaped_symbols)
 
-    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, source_symbols/np.sqrt(10))
+    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, source_symbols)
+
+    # if(p.Mod_param.NPol==2):
+    #     source_symbols, processed_symbols, demodulated_symbols = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols)
 
     plot_autocorr = True
     if(plot_autocorr==True):
@@ -58,7 +61,8 @@ if(p.lab_testing==False):
         else:
             norm_dict = {2: np.sqrt(2),
                          4: np.sqrt(10),
-                         6: np.sqrt(42)}
+                         6: np.sqrt(42),
+                         8: np.sqrt(170)}
             norm = norm_dict[p.Mod_param.Modbits]
 
             erroneous_indexes = np.where(np.abs((source_symbols/norm)-demodulated_symbols) > 1e-9)
@@ -73,7 +77,8 @@ if(p.lab_testing==False):
         else:
             norm_dict = {2: np.sqrt(2),
                          4: np.sqrt(10),
-                         6: np.sqrt(42)}
+                         6: np.sqrt(42),
+                         8: np.sqrt(170)}
             norm = norm_dict[p.Mod_param.Modbits]
             erroneous_indexesV = np.where(np.abs((source_symbols[0]/norm)-demodulated_symbols[0]) > 1e-9)
             erroneous_indexesH = np.where(np.abs((source_symbols[1]/norm)-demodulated_symbols[1]) > 1e-9)

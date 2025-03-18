@@ -92,7 +92,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 4,
+        Modbits = 8,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -108,7 +108,7 @@ fibre_param = fibre_paramX(
         L=1000*1e3, 
         D=17, 
         Clambda=1550/1e9,
-        snr_db = 17 #per symbol
+        snr_db = 26 #per symbol
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
@@ -127,12 +127,12 @@ toggle = toggleX(
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
         toggle_DE = False,
-        toggle_frequencyrecovery = True,
+        toggle_frequencyrecovery = False,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = True,    
+        toggle_adaptive_equalisation = False,    
         toggle_PAS = False,
         AIR_type = 'MI'
 )
@@ -154,8 +154,8 @@ laser_param = laser_paramX(
 CD_param = CD_paramX(fibre_param.D, fibre_param.Clambda, Mod_param.Rs, fibre_param.L)
 
 AE_param = AE_paramX(
-        NTaps = 21,
-        mu = 1e-4,
+        NTaps = 31,
+        mu = 1e-3,
         N1 = 5000,
         N2 = 8000,
         Ndiscard = 10000,
@@ -163,8 +163,8 @@ AE_param = AE_paramX(
 )
 
 BPS_param = BPS_paramX(
-        B = 32,
-        N = 6
+        B = 64,
+        N = 20
 )
 
 PAS_param = PAS_paramX(
@@ -172,7 +172,7 @@ PAS_param = PAS_paramX(
         λ = 0.05
 )
 
-lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
+lab_testing = False #If true, then lab_testing.py set to save bits and source symbols
                    #If true, then transceiver loads in real channel output data
 save_run = False
 run = "16QAM_1657"
