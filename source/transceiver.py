@@ -150,22 +150,22 @@ else: #processing channel output
 
     print('####### EXPERIMENTAL CHANNEL OUTPUT SYMBOLS LOADED #######')
 
-    # demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, nopremphasis_source_symbols)
+    # demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, Target_Signal)
     demodulated_bits, processed_symbols, demodulated_symbols = rx_final.rx_final(channel_output, Target_Signal)
 
-    if(p.Mod_param.NPol==1):
-        fig, axs = plt.subplots(1, 1, figsize=(8, 8))
-        f.plot_constellation(axs, processed_symbols, title='processed', lim=4)
+    # if(p.Mod_param.NPol==1):
+    #     fig, axs = plt.subplots(1, 1, figsize=(8, 8))
+    #     f.plot_constellation(axs, processed_symbols, title='processed', lim=4)
         
-    elif(p.Mod_param.NPol==2):
-        fig, axs = plt.subplots(1,2, figsize=(15,6.5))
-        #only plot those not discarded after adaptive equalisation
-        f.plot_constellation(axs[0], processed_symbols[0][p.AE_param.Ndiscard:], title='processed V', lim=2)
-        f.plot_constellation(axs[1], processed_symbols[1][p.AE_param.Ndiscard:], title='processed H', lim=2)
+    # elif(p.Mod_param.NPol==2):
+    #     fig, axs = plt.subplots(1,2, figsize=(15,6.5))
+    #     #only plot those not discarded after adaptive equalisation
+    #     f.plot_constellation(axs[0], processed_symbols[0][p.AE_param.Ndiscard:], title='processed V', lim=2)
+    #     f.plot_constellation(axs[1], processed_symbols[1][p.AE_param.Ndiscard:], title='processed H', lim=2)
         
-        fig1, axs1 = plt.subplots(1,2, figsize=(15,6.5))
-        ip.get_color_constellation(processed_symbols[0][p.AE_param.Ndiscard:],axs1[0])
-        ip.get_color_constellation(processed_symbols[1][p.AE_param.Ndiscard:],axs1[1])
+    #     fig1, axs1 = plt.subplots(1,2, figsize=(15,6.5))
+    #     ip.get_color_constellation(processed_symbols[0][p.AE_param.Ndiscard:],axs1[0])
+    #     ip.get_color_constellation(processed_symbols[1][p.AE_param.Ndiscard:],axs1[1])
 
 
 
@@ -173,20 +173,20 @@ else: #processing channel output
     if(plot_autocorr==True):
         if(p.Mod_param.NPol==1):
             autocorr = np.real(ifft(np.conjugate(fft(nopremphasis_source_symbols))*fft(processed_symbols)))
-            plt.figure()
-            plt.plot(autocorr)
-            plt.title('autocorrelation')
+            # plt.figure()
+            # plt.plot(autocorr)
+            # plt.title('autocorrelation')
             print('Max autocorrelation at index', np.argmax(autocorr), 'or', np.argmax(autocorr)-p.Mod_param.num_symbols)
         else:
             autocorrV = np.real(ifft(np.conjugate(fft(nopremphasis_source_symbols[0]))*fft(processed_symbols[0])))
             autocorrH = np.real(ifft(np.conjugate(fft(nopremphasis_source_symbols[1]))*fft(processed_symbols[1])))
-            plt.figure()
-            plt.plot(autocorrV)
-            plt.title('V autocorrelation')
+            # plt.figure()
+            # plt.plot(autocorrV)
+            # plt.title('V autocorrelation')
             print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-            plt.figure()    
-            plt.plot(autocorrH)
-            plt.title('H autocorrelation')
+            # plt.figure()    
+            # plt.plot(autocorrH)
+            # plt.title('H autocorrelation')
             print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
     
     source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, p.Mod_param.Modbits)
@@ -232,39 +232,6 @@ else: #processing channel output
         axs[0].scatter(processed_symbols[0][erroneous_indexesV].real, processed_symbols[0][erroneous_indexesV].imag, color='red', label='Errors', s=3, alpha=0.5)
         axs[1].scatter(processed_symbols[1][erroneous_indexesH].real, processed_symbols[1][erroneous_indexesH].imag, color='red', label='Errors', s=3, alpha=0.5)
 
-
-
-    if(p.toggle.toggle_AIR==True):
-        #Shannon limit 
-        snr_db = np.arange(0,20,1)
-        snr_dbLin = 10**(snr_db/10)
-        shannon = np.log2(1+snr_dbLin)
-        if(p.toggle.AIR_type == 'GMI'):
-            AIR_theoretical = pe.AIR_SDBW_theoretical(snr_db, p.Mod_param.Modbits)
-            plt.figure()
-            M = int(2**p.Mod_param.Modbits)
-            plt.title(f"SD-BW AIRs with {M}-QAM")
-            plt.xlabel("SNR (dB)")
-            plt.ylabel("GMI (bits/symbols)")
-            # plt.plot(snr_db, AIR, marker='o', color='b', label='Emprirical AIR')
-            plt.plot(snr_db, AIR_theoretical, marker='x', color='r', label='Theoretical AIR')
-            plt.plot(snr_db, shannon, color='g', label='Shannon Limit')
-            plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-            plt.legend(loc='lower left')
-            plt.ylim(0, AIR_theoretical[-1]+0.5)
-        elif(p.toggle.AIR_type=='MI'):
-            AIR_theoretical = pe.AIR_SDSW_theoretical(snr_db,p.Mod_param.Modbits)
-            plt.figure()
-            M = int(2**p.Mod_param.Modbits)
-            plt.title(f"SD-SW AIRs with {M}-QAM")
-            plt.xlabel("SNR (dB)")
-            plt.ylabel("MI (bits/symbols)")
-            # plt.plot(snr_db, AIR, marker='o', color='b', label='Emprirical AIR')
-            plt.plot(snr_db, AIR_theoretical, marker='x', color='r', label='Theoretical AIR')
-            plt.plot(snr_db, shannon, color='g', label='Shannon Limit')
-            plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-            plt.legend(loc='lower left')
-            plt.ylim(0, AIR_theoretical[-1]+0.5)
 
     plt.tight_layout()
         

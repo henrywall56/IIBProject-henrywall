@@ -94,12 +94,9 @@ def rx_final(rx, target_signal):
     #     Real_LMS_2x2_rx = np.array([Real_LMS_2x2_rx0,Real_LMS_2x2_rx1])
 
     # else:
-    Real_LMS_2x2_rx = Phase_Noise_compensated_rx
+    Real_LMS_2x2_rx = Phase_Noise_compensated_rx    
 
     processed_rx = f.downsample(Real_LMS_2x2_rx, 2, NPol, toggle=p.toggle.toggle_RRC)
-
-
-
 
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):

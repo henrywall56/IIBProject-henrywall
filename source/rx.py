@@ -5,7 +5,8 @@ import PAS.PAS_architecture as pas
 import DDPhaseRecoveryTesting as dd
 import parameters as p
 
-def rx(rx, source_symbols):
+def rx(rx, target_signal):
+
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
 
@@ -24,6 +25,8 @@ def rx(rx, source_symbols):
 
     CD_compensated_rx = f.CD_compensation(ADC, p.fibre_param.D, p.fibre_param.L, p.fibre_param.Clambda, p.Mod_param.Rs, NPol, spsCD, p.CD_param.NFFT, p.CD_param.NOverlap, p.toggle.toggle_CD_compensation)
     
+    CD_compensated_rx = np.array([CD_compensated_rx[0]/np.sqrt(np.mean(np.abs(CD_compensated_rx[0])**2)), CD_compensated_rx[1]/np.sqrt(np.mean(np.abs(CD_compensated_rx[1])**2))])
+
     if(p.toggle.toggle_adaptive_equalisation == True and NPol == 2):
         if(p.AE_param.AE_type=="2x2"):
             if(Modbits==2):
@@ -50,6 +53,8 @@ def rx(rx, source_symbols):
         elif(p.AE_param.AE_type=="4x4"):
             adaptive_eq_rx = f.AE_4x4(CD_compensated_rx,p.AE_param.mu,p.AE_param.NTaps, p.Mod_param.Modbits)
             downsampled_rx = f.downsample(adaptive_eq_rx, 2, NPol, True)
+
+        downsampled_rx = np.array([downsampled_rx[0]/np.sqrt(np.mean(np.abs(downsampled_rx[0])**2)), downsampled_rx[1]/np.sqrt(np.mean(np.abs(downsampled_rx[1])**2))])
 
         #downsampling done within adaptive equalisation
         figAE, axsAE = plt.subplots(1,1, figsize=(8,8))
@@ -82,8 +87,8 @@ def rx(rx, source_symbols):
 
         # Testing real valued AEQ
         # if(p.Mod_param.Modbits==4): 
-        #     real_adaptive_eq_rx0 = f.real_valued_2x2_AEQ(adaptive_eq_rx[0], p.AE_param.mu, p.AE_param.NTaps, source_symbols[0]) #testing for 16-QAM only
-        #     real_adaptive_eq_rx1 = f.real_valued_2x2_AEQ(adaptive_eq_rx[1], p.AE_param.mu, p.AE_param.NTaps, source_symbols[1]) #testing for 16-QAM only
+        #     real_adaptive_eq_rx0 = f.real_valued_2x2_AEQ(adaptive_eq_rx[0], p.AE_param.mu, p.AE_param.NTaps, target_signal[0]) #testing for 16-QAM only
+        #     real_adaptive_eq_rx1 = f.real_valued_2x2_AEQ(adaptive_eq_rx[1], p.AE_param.mu, p.AE_param.NTaps, target_signal[1]) #testing for 16-QAM only
         #     Phase_Noise_compensated_rx = np.array([real_adaptive_eq_rx0,real_adaptive_eq_rx1])
         
     else:
@@ -107,10 +112,6 @@ def rx(rx, source_symbols):
             axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), thetaHat[:,0], color='red', label='Phase Estimate (V)')
             axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), thetaHat[:,1], color='orange', label='Phase Estimate (H)')
         axsPhase.legend(loc='lower left')
-
-
-    f.estimate_snr(Phase_Noise_compensated_rx, p.Mod_param.Modbits, source_symbols)
-#   check that this is comparing the correct things
 
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):
