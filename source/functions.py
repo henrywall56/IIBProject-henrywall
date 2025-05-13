@@ -2099,7 +2099,7 @@ def gaussian_window(N, std=0.5):
 
 
 
-def align_symbols_1Pol(source, processed, demodulated):
+def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits, Modbits):
     #for one polarisaiton
     #align using autocorrelation
     N = len(source)
@@ -2111,7 +2111,6 @@ def align_symbols_1Pol(source, processed, demodulated):
     
     # Find peak index for time shift
     time_shift = np.argmax(autocorr)
-
     # Correct cyclic shift
     if time_shift > N // 2:
         time_shift -= N
@@ -2119,34 +2118,44 @@ def align_symbols_1Pol(source, processed, demodulated):
     # Align arrays
     if time_shift > 0:
         aligned_source = source[:-time_shift]
+        aligned_original_bits = original_bits[:-time_shift*Modbits]
         aligned_processed = processed[time_shift:]
         aligned_demodulated = demodulated[time_shift:]
+        aligned_demod_bits = demod_bits[time_shift*Modbits:]
     elif time_shift < 0:
         aligned_source = source[-time_shift:]
+        aligned_original_bits = original_bits[-time_shift*Modbits:]
         aligned_processed = processed[:time_shift]
         aligned_demodulated = demodulated[:time_shift]
+        aligned_demod_bits = demod_bits[:time_shift*Modbits]
     else:
         aligned_source = source
+        aligned_original_bits = original_bits
         aligned_processed = processed
         aligned_demodulated = demodulated
+        aligned_demod_bits = demod_bits
 
     # Ensure equal length
     min_length = min(len(aligned_source), len(aligned_processed))
 
-    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length]
+    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length], aligned_demod_bits[:min_length*Modbits], aligned_original_bits[:min_length*Modbits]
 
 
-def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols):
-    source_symbols0, processed_symbols0, demodulated_symbols0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0])
-    source_symbols1, processed_symbols1, demodulated_symbols1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1])
+def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, Modbits):
+    source_symbols0, processed_symbols0, demodulated_symbols0, demodulated_bits0, original_bits0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0], demodulated_bits[0], original_bits[0], Modbits)
+    source_symbols1, processed_symbols1, demodulated_symbols1, demodulated_bits1, original_bits1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1], demodulated_bits[1], original_bits[1], Modbits)
 
     final_len = min(len(source_symbols0), len(source_symbols1))
 
     source_symbols = np.array([source_symbols0[:final_len], source_symbols1[:final_len]])
     processed_symbols = np.array([processed_symbols0[:final_len], processed_symbols1[:final_len]])
     demodulated_symbols = np.array([demodulated_symbols0[:final_len], demodulated_symbols1[:final_len]])
+    demodulated_bits = np.array([demodulated_bits0[:final_len*Modbits], demodulated_bits1[:final_len*Modbits]])
+    demodulated_symbols = np.array([demodulated_symbols0[:final_len], demodulated_symbols1[:final_len]])
+    original_bits = np.array([original_bits0[:final_len*Modbits], original_bits1[:final_len*Modbits]])
 
-    return source_symbols, processed_symbols, demodulated_symbols
+
+    return source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits
 
 
 
@@ -2494,3 +2503,5 @@ def MIMO_2x2_with_CPR(x,d,mu,NTaps):
 #     w2H += Mu * xH * np.conj(d2 - y2)
 
 #     return w1V, w1H, w2V, w2H
+
+

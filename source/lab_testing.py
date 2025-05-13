@@ -35,10 +35,10 @@ if(p.lab_testing==True and p.save_run==True):
  
     #  SAVING ORIGINAL BITS
     if(p.Mod_param.NPol==1):
-        np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_{run}_{timestamp}.csv"), original_bits, delimiter=",", fmt="%d")
+        np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_{run}_{timestamp}.csv"), original_bits, delimiter=",", fmt="%d")
     else:
-        np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}_{timestamp}.csv"), original_bits[0], delimiter=",", fmt="%d")
-        np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}_{timestamp}.csv"), original_bits[1], delimiter=",", fmt="%d")
+        np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_Pol0_{run}_{timestamp}.csv"), original_bits[0], delimiter=",", fmt="%d")
+        np.savetxt(os.path.join(original_bits_save_dir, f"original_bits_Pol1_{run}_{timestamp}.csv"), original_bits[1], delimiter=",", fmt="%d")
     print('######### SAVED BITS #########')
 
 pulse_shaped_symbols, source_symbols = tx.tx(original_bits)

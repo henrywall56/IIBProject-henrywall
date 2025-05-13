@@ -163,8 +163,8 @@ AE_param = AE_paramX(
 )
 
 BPS_param = BPS_paramX(
-        B = 20,
-        N = 5
+        B = 64,
+        N = 10
 )
 
 PAS_param = PAS_paramX(

@@ -110,7 +110,7 @@ def rx(rx, source_symbols):
 
 
     f.estimate_snr(Phase_Noise_compensated_rx, p.Mod_param.Modbits, source_symbols)
-
+#   check that this is comparing the correct things
 
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):

@@ -27,7 +27,7 @@ def rx_final(rx, target_signal):
     
     frequency_recovered_rx = f.frequency_recovery(CD_compensated_rx, p.Mod_param.Rs, NPol, p.toggle.toggle_frequencyrecovery)
 
-    frequency_recovered_rx = np.array([frequency_recovered_rx[0]/np.mean(np.abs(frequency_recovered_rx[0])**2), frequency_recovered_rx[1]/np.mean(np.abs(frequency_recovered_rx[1])**2)])
+    frequency_recovered_rx = np.array([frequency_recovered_rx[0]/np.sqrt(np.mean(np.abs(frequency_recovered_rx[0])**2)), frequency_recovered_rx[1]/np.sqrt(np.mean(np.abs(frequency_recovered_rx[1])**2))])
 
     if(p.toggle.toggle_adaptive_equalisation == True and NPol == 2):
         #***adaptive equalisation (2x2 MIMO, LMS with known data)***
@@ -44,10 +44,6 @@ def rx_final(rx, target_signal):
         axsAE.set_ylabel('magnitude of symbols')
         axsAE.plot(abs(MIMO_LMS_2x2_rx[1]), linestyle='', marker='o', markersize='1', color='r', label='y2 mag.')
         axsAE.set_ylim(0,3)
-        if(p.AE_param.AE_type=="2x2"):
-            axsAE.vlines(p.AE_param.N1, colors='purple', label='N1', ymin=0, ymax=3)
-            axsAE.vlines(p.AE_param.N2, colors='green', label='N2', ymin=0, ymax=3)
-        axsAE.vlines(p.AE_param.Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
         axsAE.legend()
 
     else:
@@ -55,7 +51,7 @@ def rx_final(rx, target_signal):
     
     #Still 2sps
     #Normalise:
-    MIMO_LMS_2x2_rx = np.array([MIMO_LMS_2x2_rx[0]/np.mean(np.abs(MIMO_LMS_2x2_rx[0])**2), MIMO_LMS_2x2_rx[1]/np.mean(np.abs(MIMO_LMS_2x2_rx[1])**2)])
+    MIMO_LMS_2x2_rx = np.array([MIMO_LMS_2x2_rx[0]/np.sqrt(np.mean(np.abs(MIMO_LMS_2x2_rx[0])**2)), MIMO_LMS_2x2_rx[1]/np.sqrt(np.mean(np.abs(MIMO_LMS_2x2_rx[1])**2))])
 
     if(p.toggle.toggle_BPS==True):
         print('--------------------------------------')
@@ -68,11 +64,6 @@ def rx_final(rx, target_signal):
             plt.figure()
             plt.plot(thetaHat, color='blue')
 
-        # Testing real valued AEQ
-        # if(p.Mod_param.Modbits==4): 
-        #     real_adaptive_eq_rx0 = f.real_valued_2x2_AEQ(adaptive_eq_rx[0], p.AE_param.mu, p.AE_param.NTaps, source_symbols[0]) #testing for 16-QAM only
-        #     real_adaptive_eq_rx1 = f.real_valued_2x2_AEQ(adaptive_eq_rx[1], p.AE_param.mu, p.AE_param.NTaps, source_symbols[1]) #testing for 16-QAM only
-        #     Phase_Noise_compensated_rx = np.array([real_adaptive_eq_rx0,real_adaptive_eq_rx1])
         
     else:
         #Note DD algorithm currently only set up for NPol==1
@@ -107,9 +98,7 @@ def rx_final(rx, target_signal):
 
     processed_rx = f.downsample(Real_LMS_2x2_rx, 2, NPol, toggle=p.toggle.toggle_RRC)
 
-    known_symbols = target_signal[:,::2]
 
-    f.estimate_snr(processed_rx[:,p.AE_param.NTaps:], p.Mod_param.Modbits, known_symbols[:,p.AE_param.NTaps:])
 
 
     if(p.toggle.toggle_PAS==True):
