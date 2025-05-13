@@ -10,6 +10,7 @@ import os
 import scipy
 from scipy.fft import fft, ifft
 import intensity_plot as ip
+import rx_final as rx_final
 
 
 if(p.lab_testing==False):
@@ -123,6 +124,8 @@ else: #processing channel output
         channel_output1 = channel_output1[2048:] 
         channel_output = np.array([channel_output0, channel_output1])
         nopremphasis_source_symbols = np.array([matlab_objects_dict["SignalX_nopre"][::2].squeeze(),matlab_objects_dict["SignalY_nopre"][::2].squeeze()])
+        Target_Signal = np.array([channel_output_dict["D"][:,0].squeeze(),channel_output_dict["D"][:,1].squeeze()])
+
     
     fig5, axs5 = plt.subplots(1,2, figsize=(15,6.5))
 
@@ -144,8 +147,7 @@ else: #processing channel output
     print('####### EXPERIMENTAL CHANNEL OUTPUT SYMBOLS LOADED #######')
 
     demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, nopremphasis_source_symbols)
-
-
+    # demodulated_bits, processed_symbols, demodulated_symbols = rx_final.rx_final(channel_output, Target_Signal)
 
     if(p.Mod_param.NPol==1):
         fig, axs = plt.subplots(1, 1, figsize=(8, 8))

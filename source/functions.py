@@ -2096,67 +2096,192 @@ def gaussian_window(N, std=0.5):
     window = np.exp(-0.5 * (n / sigma) ** 2)  # Gaussian function
     return window / np.max(window)  # Normalize to peak at 1
     
-def real_valued_2x2_AEQ(signal_1Pol, mu, NTaps, source_1Pol):
-    #16-QAM only currently
 
-    R_RDE = np.array([1/np.sqrt(5), 1, 3/np.sqrt(5)])
 
-    N = len(signal_1Pol)
-    output_real = np.zeros(N, dtype=np.float64)
-    output_imag = np.zeros(N, dtype=np.float64)
-    output_complex = np.zeros(N, dtype=np.complex128)
 
-    Hrr = np.zeros(NTaps,dtype=np.float64)
-    Hri = np.zeros(NTaps,dtype=np.float64)
-    Hir = np.zeros(NTaps,dtype=np.float64)
-    Hii = np.zeros(NTaps,dtype=np.float64)
+def align_symbols_1Pol(source, processed, demodulated):
+    #for one polarisaiton
+    #align using autocorrelation
+    N = len(source)
+
+    # Compute FFT-based cross-correlation
+    X = fft(source)
+    Y = fft(processed)
+    autocorr = np.real(ifft(np.conjugate(X) * Y))
     
-    Hrr[NTaps // 2] = 1
-    Hri[NTaps // 2] = 0.1
-    Hir[NTaps // 2] = 0.1
-    Hii[NTaps // 2] = 1
+    # Find peak index for time shift
+    time_shift = np.argmax(autocorr)
 
-    _d = np.roll(source_1Pol, np.ceil(NTaps/2).astype(int))
+    # Correct cyclic shift
+    if time_shift > N // 2:
+        time_shift -= N
 
-    for i in range(NTaps, N):
-        _x = np.flip(signal_1Pol[i-NTaps:i])
-        _x_real = np.real(_x)
-        _x_imag = np.imag(_x)
+    # Align arrays
+    if time_shift > 0:
+        aligned_source = source[:-time_shift]
+        aligned_processed = processed[time_shift:]
+        aligned_demodulated = demodulated[time_shift:]
+    elif time_shift < 0:
+        aligned_source = source[-time_shift:]
+        aligned_processed = processed[:time_shift]
+        aligned_demodulated = demodulated[:time_shift]
+    else:
+        aligned_source = source
+        aligned_processed = processed
+        aligned_demodulated = demodulated
 
-        output_real[i] = np.sum(Hrr * _x_real) + np.sum(Hir * _x_imag)
-        output_imag[i] = np.sum(Hri * _x_real) + np.sum(Hii * _x_imag)
+    # Ensure equal length
+    min_length = min(len(aligned_source), len(aligned_processed))
 
-        #update epsilon
-    
-        epsilon_real = np.real(_d[i]) - output_real[i]
-
-        epsilon_imag = np.imag(_d[i]) - output_imag[i]
-
-        Hrr += mu * _x_real * epsilon_real
-        Hir += mu * _x_imag * epsilon_real
-        Hri += mu * _x_real * epsilon_imag
-        Hii += mu * _x_imag * epsilon_imag
-
-        output_complex[i] = output_real[i] + 1j*output_imag[i]
-    
-    plt.figure()
-    plt.plot(Hrr, color='blue')
-    plt.plot(Hir, color='red')
-    plt.plot(Hri, color='pink')
-    plt.plot(Hii, color='purple')
-    
-    return output_complex
+    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length]
 
 
+def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols):
+    source_symbols0, processed_symbols0, demodulated_symbols0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0])
+    source_symbols1, processed_symbols1, demodulated_symbols1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1])
+
+    final_len = min(len(source_symbols0), len(source_symbols1))
+
+    source_symbols = np.array([source_symbols0[:final_len], source_symbols1[:final_len]])
+    processed_symbols = np.array([processed_symbols0[:final_len], processed_symbols1[:final_len]])
+    demodulated_symbols = np.array([demodulated_symbols0[:final_len], demodulated_symbols1[:final_len]])
+
+    return source_symbols, processed_symbols, demodulated_symbols
 
 
 
+def estimate_snr(rx_symbols, Modbits, tx_symbols):
+    if(Modbits==2):
+        tx_symbols = tx_symbols/np.sqrt(2)
+    elif(Modbits==4):
+        tx_symbols = tx_symbols/np.sqrt(10)
+    elif(Modbits==6):
+        tx_symbols = tx_symbols/np.sqrt(42)
+    elif(Modbits==8):
+        tx_symbols = tx_symbols/np.sqrt(170)
+
+    # Signal power (mean power of the ideal symbols)
+    signal_power0 = np.sum(np.abs(tx_symbols[0])**2)
+    # Noise power (mean squared error)
+    noise_power0 = np.sum(np.abs(rx_symbols[0] - tx_symbols[0])**2)
+    # SNR in dB
+    snr_db0 = 10 * np.log10(signal_power0 / noise_power0)
+
+    # Signal power (mean power of the ideal symbols)
+    signal_power1 = np.sum(np.abs(tx_symbols[1])**2)
+    # Noise power (mean squared error)
+    noise_power1 = np.sum(np.abs(rx_symbols[1] - tx_symbols[1])**2)
+    # SNR in dB
+    snr_db1 = 10 * np.log10(signal_power1 / noise_power1)
+
+    print('SNR_dB Pol0 Estimate:', snr_db0)
+    print('SNR_dB Pol1 Estimate:', snr_db1)
 
 
+def MIMO_LMS_AEQ(x,d,mu,NTaps):
+        N = x.shape[1]
+        y1 = np.zeros(N,dtype=complex)
+        y2 = np.zeros(N,dtype=complex)
+        w1V = np.zeros(NTaps,dtype=complex)
+        w1H = np.zeros(NTaps,dtype=complex)
+        w2V = np.zeros(NTaps,dtype=complex)
+        w2H = np.zeros(NTaps,dtype=complex)
+       
+        w1V[NTaps // 2] = 1
+        w1H[NTaps // 2] = 1
+        w2V[NTaps // 2] = 1
+        w2H[NTaps // 2] = 1
+
+        d1 = np.roll(d[0], np.ceil(NTaps / 2).astype(int))
+        d2 = np.roll(d[1], np.ceil(NTaps / 2).astype(int))
+        x_V = x[0]
+        x_H = x[1]
+       
+        e = np.zeros(N,dtype=complex)
+
+        for i in range(NTaps, N):
+            xV = np.flip(x_V[i-NTaps:i])
+            xH = np.flip(x_H[i-NTaps:i])
+
+            w1V_H = np.conj(w1V).reshape(1, -1)
+            w1H_H = np.conj(w1H).reshape(1, -1)
+            w2V_H = np.conj(w2V).reshape(1, -1)
+            w2H_H = np.conj(w2H).reshape(1, -1)
+
+            y1[i] = (np.dot(w1V_H, xV) + np.dot(w1H_H, xH)).squeeze()
+            y2[i] = (np.dot(w2V_H, xV) + np.dot(w2H_H, xH)).squeeze()
+
+            e[i] = d1[i] - y1[i]
+            w1V += mu * xV * np.conj(d1[i] - y1[i])
+            w1H += mu * xH * np.conj(d1[i] - y1[i])
+            w2V += mu * xV * np.conj(d2[i] - y2[i])
+            w2H += mu * xH * np.conj(d2[i] - y2[i])
+        y = np.array([y1, y2])
+
+        plt.figure()
+        plt.title('LMS AEQ Tap Weights')
+        plt.plot(abs(w1V),color='black')
+        plt.plot(abs(w1H),color='orange')
+        plt.plot(abs(w2V), color='r')
+        plt.plot(abs(w2H), color='b')
+
+        # return w1V, w1H, w2V, w2H, y, e
+        return y
+
+
+def MIMO_2x2_with_CPR(x,d,mu,NTaps):
+        #Real valued AEQ with carrier phase recovery
+        #x, d are 1 polarisation
+        N = x.shape[0]
+        y_real = np.zeros(N,dtype=np.float64)
+        y_imag = np.zeros(N,dtype=np.float64)
+        y_complex = np.zeros(N,dtype=np.complex128)
+
+        Hrr = np.zeros(NTaps,dtype=np.float64)
+        Hri = np.zeros(NTaps,dtype=np.float64)
+        Hir = np.zeros(NTaps,dtype=np.float64)
+        Hii = np.zeros(NTaps,dtype=np.float64)
+       
+        Hrr[NTaps // 2] = 1
+        Hri[NTaps // 2] = 0.1
+        Hir[NTaps // 2] = 0.1
+        Hii[NTaps // 2] = 1
+
+        _d = np.roll(d, np.ceil(NTaps / 2).astype(int))
+        e_real = np.zeros(N,dtype=np.float64)
+        e_imag = np.zeros(N,dtype=np.float64)
+
+        for i in range(NTaps, N):
+            _x = np.flip(x[i-NTaps:i])
+            _x_real = np.real(_x)
+            _x_imag = np.imag(_x)
+
+            y_real[i] = np.sum(Hrr * _x_real) + np.sum(Hir * _x_imag)
+            y_imag[i] = np.sum(Hri * _x_real) + np.sum(Hii * _x_imag)
+
+            e_real[i] = np.real(_d[i]) - y_real[i]
+            e_imag[i] = np.imag(_d[i]) - y_imag[i]
+
+            Hrr += mu * _x_real * e_real[i]
+            Hir += mu * _x_imag * e_real[i]
+            Hri += mu * _x_real * e_imag[i]
+            Hii += mu * _x_imag * e_imag[i]
+
+            y_complex[i] = y_real[i] + 1j*y_imag[i]
+        
+        plt.figure()
+        plt.plot(Hrr, color='blue')
+        plt.plot(Hir, color='red')
+        plt.plot(Hri, color='pink')
+        plt.plot(Hii, color='purple')
+        plt.title("Real Valued AEQ Filter Weights")
+
+        return y_complex
 
 
 
 # UNUSED FUNCTIONS:
+
 # def mix_polarization_signals(signal, angle_deg):
 #     # Convert the angle to radians
 #     angle_rad = np.deg2rad(angle_deg)
@@ -2287,6 +2412,8 @@ def real_valued_2x2_AEQ(signal_1Pol, mu, NTaps, source_1Pol):
 #         #NTaps: number of taps for the filters in the butterfly configuration.
 #         #Mu: step-size for coefficients calculation.
 #         #d: known training symbols, used for first Ntrain steps
+#         #Ntrain: Number of training steps
+#         #N1: Initialisation of Pol2 filter coefficients
 
 
 #         input_norm0 = input[0]/np.sqrt(np.sum(np.abs(input[0])**2)/(input.shape[1]))
@@ -2367,81 +2494,3 @@ def real_valued_2x2_AEQ(signal_1Pol, mu, NTaps, source_1Pol):
 #     w2H += Mu * xH * np.conj(d2 - y2)
 
 #     return w1V, w1H, w2V, w2H
-
-def align_symbols_1Pol(source, processed, demodulated):
-    #for one polarisaiton
-    #align using autocorrelation
-    N = len(source)
-
-    # Compute FFT-based cross-correlation
-    X = fft(source)
-    Y = fft(processed)
-    autocorr = np.real(ifft(np.conjugate(X) * Y))
-    
-    # Find peak index for time shift
-    time_shift = np.argmax(autocorr)
-
-    # Correct cyclic shift
-    if time_shift > N // 2:
-        time_shift -= N
-
-    # Align arrays
-    if time_shift > 0:
-        aligned_source = source[:-time_shift]
-        aligned_processed = processed[time_shift:]
-        aligned_demodulated = demodulated[time_shift:]
-    elif time_shift < 0:
-        aligned_source = source[-time_shift:]
-        aligned_processed = processed[:time_shift]
-        aligned_demodulated = demodulated[:time_shift]
-    else:
-        aligned_source = source
-        aligned_processed = processed
-        aligned_demodulated = demodulated
-
-    # Ensure equal length
-    min_length = min(len(aligned_source), len(aligned_processed))
-
-    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length]
-
-
-def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols):
-    source_symbols0, processed_symbols0, demodulated_symbols0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0])
-    source_symbols1, processed_symbols1, demodulated_symbols1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1])
-
-    final_len = min(len(source_symbols0), len(source_symbols1))
-
-    source_symbols = np.array([source_symbols0[:final_len], source_symbols1[:final_len]])
-    processed_symbols = np.array([processed_symbols0[:final_len], processed_symbols1[:final_len]])
-    demodulated_symbols = np.array([demodulated_symbols0[:final_len], demodulated_symbols1[:final_len]])
-
-    return source_symbols, processed_symbols, demodulated_symbols
-
-
-
-def estimate_snr(rx_symbols, Modbits, tx_symbols):
-    if(Modbits==2):
-        tx_symbols = tx_symbols/np.sqrt(2)
-    elif(Modbits==4):
-        tx_symbols = tx_symbols/np.sqrt(10)
-    elif(Modbits==6):
-        tx_symbols = tx_symbols/np.sqrt(42)
-    elif(Modbits==8):
-        tx_symbols = tx_symbols/np.sqrt(170)
-
-    # Signal power (mean power of the ideal symbols)
-    signal_power0 = np.mean(np.abs(tx_symbols[0])**2)
-    # Noise power (mean squared error)
-    noise_power0 = np.mean(np.abs(rx_symbols[0] - tx_symbols[0])**2)
-    # SNR in dB
-    snr_db0 = 10 * np.log10(signal_power0 / noise_power0)
-
-    # Signal power (mean power of the ideal symbols)
-    signal_power1 = np.mean(np.abs(tx_symbols[1])**2)
-    # Noise power (mean squared error)
-    noise_power1 = np.mean(np.abs(rx_symbols[1] - tx_symbols[1])**2)
-    # SNR in dB
-    snr_db1 = 10 * np.log10(signal_power1 / noise_power1)
-
-    print('SNR_dB Pol0 Estimate:', snr_db0)
-    print('SNR_dB Pol1 Estimate:', snr_db1)

@@ -44,7 +44,7 @@ def get_color_constellation(wavein,axs:plt.Axes):
     
     for k in range(Nslice - 1, -1, -1):
         mask = (disdata >= centers[k] - halfwide) & (disdata <= centers[k] + halfwide)
-        axs.scatter(np.real(wavein[mask]), np.imag(wavein[mask]), c=[cmap[indexcolor[k] - 1]], s=1, marker='.')
+        axs.scatter(np.real(wavein[mask]), np.imag(wavein[mask]), c=[cmap[indexcolor[k] - 1]], s=2, marker='.')
     
     axs.grid(alpha=0.2)
     axs.set_xlabel('In-Phase')

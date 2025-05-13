@@ -14,6 +14,7 @@ import PAS.ldpc_jossy
 from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
+import intensity_plot as ip
 
 plt.rcParams['font.size'] = 12  # Change the font size
 plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
@@ -112,7 +113,7 @@ def main():
     toggle_AIR = True
     toggle_adaptive_equalisation = False
     AIR_type = 'MI' #'MI' or 'GMI'
-    toggle_PAS = False
+    toggle_PAS = True
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -436,6 +437,11 @@ def main():
                 axs5[i//3].vlines(N2, colors='green', label='N2', ymin=0, ymax=3)
                 axs5[i//3].vlines(Ndiscard, colors='orange', label='Ndiscard', ymin=0, ymax=3)
                 axs5[i//3].legend()
+
+            if(NPol==2):
+                fig1, axs1 = plt.subplots(1,2, figsize=(15,6.5))
+                ip.get_color_constellation(Phase_Noise_compensated_rx[0],axs1[0])
+                ip.get_color_constellation(Phase_Noise_compensated_rx[1],axs1[1])
 
             # autocorrV = np.real(ifft(np.conjugate(fft(symbols[0]))*fft(Phase_Noise_compensated_rx[0])))
             # plt.figure()

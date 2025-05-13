@@ -122,7 +122,7 @@ toggle = toggleX(
         toggle_RRC = True,
         toggle_AWGNnoise = True,
         toggle_phasenoise = False,
-        toggle_phasenoisecompensation = True,
+        toggle_phasenoisecompensation = False,
         toggle_plotuncompensatedphase = False,
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
@@ -163,8 +163,8 @@ AE_param = AE_paramX(
 )
 
 BPS_param = BPS_paramX(
-        B = 32,
-        N = 20
+        B = 20,
+        N = 5
 )
 
 PAS_param = PAS_paramX(
