@@ -8,9 +8,10 @@ import os
 from scipy.io import savemat
 import datetime
 
-timestamp = datetime.datetime.now().strftime("%H%M")
+timestamp = datetime.datetime.now().strftime("%a_%Y%m%d_%H%M")
 
 if(p.toggle.toggle_PAS==False):
+    np.random.seed(1)
     original_bits = f.generate_original_bits(p.Mod_param.num_symbols, p.Mod_param.Modbits, p.Mod_param.NPol) #NPol-dimensional array
 else:
     original_bits = np.random.randint(0, 2, size= p.PAS_param.k*p.PAS_param.blocks*2*p.Mod_param.NPol)

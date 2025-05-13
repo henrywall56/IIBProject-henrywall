@@ -92,7 +92,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 8,
+        Modbits = 2,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -108,7 +108,7 @@ fibre_param = fibre_paramX(
         L=1000*1e3, 
         D=17, 
         Clambda=1550/1e9,
-        snr_db = 26 #per symbol
+        snr_db = 10 #per symbol
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
@@ -122,17 +122,17 @@ toggle = toggleX(
         toggle_RRC = True,
         toggle_AWGNnoise = True,
         toggle_phasenoise = False,
-        toggle_phasenoisecompensation = False,
+        toggle_phasenoisecompensation = True,
         toggle_plotuncompensatedphase = False,
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
         toggle_DE = False,
-        toggle_frequencyrecovery = False,
+        toggle_frequencyrecovery = True,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = False,    
+        toggle_adaptive_equalisation = True,    
         toggle_PAS = False,
         AIR_type = 'MI'
 )
@@ -163,7 +163,7 @@ AE_param = AE_paramX(
 )
 
 BPS_param = BPS_paramX(
-        B = 64,
+        B = 32,
         N = 20
 )
 
@@ -172,7 +172,8 @@ PAS_param = PAS_paramX(
         λ = 0.05
 )
 
-lab_testing = False #If true, then lab_testing.py set to save bits and source symbols
+lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
                    #If true, then transceiver loads in real channel output data
 save_run = False
-run = "16QAM_1657"
+
+run = "QPSK_Tue_20250513_1219"

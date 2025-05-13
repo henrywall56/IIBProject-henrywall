@@ -9,6 +9,7 @@ import performance_evaluation as pe
 import os
 import scipy
 from scipy.fft import fft, ifft
+import intensity_plot as ip
 
 
 if(p.lab_testing==False):
@@ -102,33 +103,49 @@ else: #processing channel output
     #     original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
     #     original_bits = np.array([original_bits0,original_bits1])
 
-    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"16QAM_2Pol_1657_rx"))
+    # channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"16QAM_2Pol_1657_rx"))
+    # matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"16QAM_1657.mat"))
 
-    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"16QAM_1657.mat"))
+    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"X_D_DualPol"))
+    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"QPSK_DualPol.mat"))
 
     if(p.Mod_param.NPol==1):
-        channel_output = np.array(channel_output_dict["X_payload"].squeeze())
+        #channel_output = np.array(channel_output_dict["X_payload"].squeeze())
+        channel_output = np.array(channel_output_dict["X"][:,0].squeeze())
         channel_output = channel_output[2048:]
-        nopremphasis_source_symbols = np.array(matlab_objects_dict["SignalX_nopre"].squeeze())
+        nopremphasis_source_symbols = np.array(matlab_objects_dict["SignalX_nopre"][::2].squeeze())
     else:
-        channel_output0 = channel_output_dict["X_payload"].squeeze()
-        channel_output1 = channel_output_dict["Y_payload"].squeeze()
+        # channel_output0 = channel_output_dict["X_payload"].squeeze()
+        # channel_output1 = channel_output_dict["Y_payload"].squeeze()
+        channel_output0 = channel_output_dict["X"][:,0].squeeze()
+        channel_output1 = channel_output_dict["X"][:,1].squeeze()
         channel_output0 = channel_output0[2048:]
         channel_output1 = channel_output1[2048:] 
         channel_output = np.array([channel_output0, channel_output1])
         nopremphasis_source_symbols = np.array([matlab_objects_dict["SignalX_nopre"][::2].squeeze(),matlab_objects_dict["SignalY_nopre"][::2].squeeze()])
     
     fig5, axs5 = plt.subplots(1,2, figsize=(15,6.5))
-    #only plot those not discarded after adaptive equalisation
-    nopremphasis_source_symbols0 = nopremphasis_source_symbols[0]/(np.mean(np.abs(nopremphasis_source_symbols[0])**2))
-    nopremphasis_source_symbols1 = nopremphasis_source_symbols[1]/(np.mean(np.abs(nopremphasis_source_symbols[1])**2))
-    nopremphasis_source_symbols = np.array([nopremphasis_source_symbols0, nopremphasis_source_symbols1])
 
-    f.plot_constellation(axs5[0], nopremphasis_source_symbols[0], title='source symbols', lim=2)
-    
+    if(p.Mod_param.NPol==1):
+        nopremphasis_source_symbols = nopremphasis_source_symbols[1536:]/(np.mean(np.abs(nopremphasis_source_symbols[1536:])**2))
+    if(p.Mod_param.NPol==2):
+        #only plot those not discarded after adaptive equalisation
+        nopremphasis_source_symbols0 = nopremphasis_source_symbols[0][1536:]/(np.mean(np.abs(nopremphasis_source_symbols[0][1536:])**2))
+        nopremphasis_source_symbols1 = nopremphasis_source_symbols[1][1536:]/(np.mean(np.abs(nopremphasis_source_symbols[1][1536:])**2))
+        nopremphasis_source_symbols = np.array([nopremphasis_source_symbols0, nopremphasis_source_symbols1])
+
+    if(p.Mod_param.NPol==1):    
+        f.plot_constellation(axs5[0], nopremphasis_source_symbols, title='source symbols', lim=2)
+    else:
+        f.plot_constellation(axs5[0], nopremphasis_source_symbols[0], title='source symbols', lim=2)
+        f.plot_constellation(axs5[1], nopremphasis_source_symbols[1], title='source symbols', lim=2)
+
+
     print('####### EXPERIMENTAL CHANNEL OUTPUT SYMBOLS LOADED #######')
 
     demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, nopremphasis_source_symbols)
+
+
 
     if(p.Mod_param.NPol==1):
         fig, axs = plt.subplots(1, 1, figsize=(8, 8))
@@ -139,8 +156,15 @@ else: #processing channel output
         #only plot those not discarded after adaptive equalisation
         f.plot_constellation(axs[0], processed_symbols[0][p.AE_param.Ndiscard:], title='processed V', lim=2)
         f.plot_constellation(axs[1], processed_symbols[1][p.AE_param.Ndiscard:], title='processed H', lim=2)
+        
+        fig1, axs1 = plt.subplots(1,2, figsize=(15,6.5))
+        ip.get_color_constellation(processed_symbols[0][p.AE_param.Ndiscard:],axs1[0])
+        ip.get_color_constellation(processed_symbols[1][p.AE_param.Ndiscard:],axs1[1])
+        
+
+    plt.show()
 
 
-plt.show()
+
 
 

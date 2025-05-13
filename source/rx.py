@@ -108,6 +108,10 @@ def rx(rx, source_symbols):
             axsPhase.plot(1e9*np.arange(p.Mod_param.num_symbols)/(p.Mod_param.Rs*p.RRC_param.sps), thetaHat[:,1], color='orange', label='Phase Estimate (H)')
         axsPhase.legend(loc='lower left')
 
+
+    f.estimate_snr(Phase_Noise_compensated_rx, p.Mod_param.Modbits, source_symbols)
+
+
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):
             demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)

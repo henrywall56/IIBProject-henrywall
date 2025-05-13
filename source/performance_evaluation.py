@@ -512,6 +512,8 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
                 if(p.toggle.AIR_type=='GMI'):
                     AIR = 0.5*(AIR_SDBW(source_symbols[0], original_bits[0],processed_symbols[0], p.Mod_param.Modbits) + AIR_SDBW(source_symbols[1], original_bits[1], processed_symbols[1], p.Mod_param.Modbits))
                 elif(p.toggle.AIR_type=='MI'):
+                    print('AIR0',AIR_SDSW(source_symbols[0], processed_symbols[0], p.Mod_param.Modbits)) #TESTING
+                    print('AIR1', AIR_SDSW(source_symbols[1], processed_symbols[1], p.Mod_param.Modbits)) #TESTING
                     AIR = 0.5*(AIR_SDSW(source_symbols[0], processed_symbols[0], p.Mod_param.Modbits)+AIR_SDSW(source_symbols[1], processed_symbols[1], p.Mod_param.Modbits))
                     
             else:
@@ -523,7 +525,8 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
     if(p.toggle.toggle_AIR==True):
         #Shannon limit 
         snr_db = p.fibre_param.snr_db
-        snr_dbarr = np.array([snr_db-3, snr_db-2, snr_db-1, snr_db, snr_db+1, snr_db+2, snr_db+3])
+        range = 21
+        snr_dbarr = np.arange(snr_db-range//2, snr_db+range//2,1)
         snr_dbLinarr = 10**(snr_dbarr/10)
         shannon = np.log2(1+snr_dbLinarr)
         if(p.toggle.AIR_type == 'GMI'):

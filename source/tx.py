@@ -100,7 +100,6 @@ def tx(original_bits):
         print('Symbol Rate:         ', Rs/1e9, 'GBaud')
         print('Bit Rate:            ', 2*((kpas)/Npas)*Rs/1e9, 'GBit/s')
         print('--------------------------------------')
-
     
     #Pulse shaping with RRC filter
     pulse_shaped_symbols = f.pulseshaping(symbols, p.RRC_param.sps, p.RRC_param.RRCimpulse, NPol, toggle = p.toggle.toggle_RRC) #if toggle False, this function just returns symbol

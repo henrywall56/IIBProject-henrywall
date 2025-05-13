@@ -28,7 +28,7 @@ def generate_original_bits(num_symbols, Modbits, NPol):
     #If NPol == 1: generate 1D array of bits
     #If NPol == 2: generate 2D array of bits
     #bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
-    np.random.seed(1)
+    # np.random.seed(1)
 
     bits = np.random.randint(0, 2, size=num_symbols * Modbits*NPol)
 
@@ -40,7 +40,7 @@ def generate_original_bits(num_symbols, Modbits, NPol):
 @benchmark(enable_benchmark)
 def generate_QPSK_symbols(bits):
     # QPSK is 2 bits/symbol, so create array of blocks of 4 bits
-    # Mapping dictionary for 16QAM symbols
+    # Mapping dictionary for QPSK symbols
     symbol_mapping = {
         (0,0): -1 - 1j,
         (0,1): -1 + 1j,
@@ -51,7 +51,7 @@ def generate_QPSK_symbols(bits):
     symbols = np.array([
         symbol_mapping[tuple(bits[i:i + 2])] for i in range(0, len(bits), 2)
     ])
-    #return symbols/np.sqrt(2)
+    #return symbols/np. (2)
     return symbols
 
 @benchmark(enable_benchmark)
@@ -620,6 +620,7 @@ def pulseshaping(symbols, sps, RRCimpulse, NPol, toggle):
             shaped = shaped/(np.sqrt(np.mean(abs(shaped)**2)))
 
             return shaped
+        
         elif(NPol==2):
             #upsample the symbols by inserting (sps-1) zeros between each symbol
             upsampled0 = np.zeros(sps*len(symbols[0]), dtype=complex)
@@ -657,7 +658,7 @@ def add_noise(signal, snr_db, sps, Modbits, NPol, toggle_AWGNnoise): #SNR PER SY
             stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*snr))
             noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))
             noise1 = stdev1 * (np.random.randn(len(signal[1])) + 1j * np.random.randn(len(signal[1])))
-            
+            print('sigma0',stdev0, 'sigma1', stdev1)
             return np.array([signal[0]+noise0, signal[1]+noise1], dtype=complex), 0.5*(stdev0+stdev1)
 
     else:
@@ -1171,7 +1172,7 @@ def decode_symbols(symbols, Modbits, NPol):
     if(NPol==1):
         bits = np.zeros(len(symbols) * Modbits, dtype=int)
         for i, symbol in enumerate(symbols):
-            bits[i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(round(symbol.real*np.sqrt(root)))+int(round(symbol.imag*np.sqrt(root))*1j)] #bit stream
+            bits[i * Modbits:(i + 1) * Modbits] = reverse_mapping[int(round(symbol.real*np.sqrt(root)))+int(round(symbol.imag*np.sqrt(root)))*1j] #bit stream
         return bits
     elif(NPol==2):
         bits = np.zeros((NPol, len(symbols[0]) * Modbits), dtype=int)
@@ -2415,3 +2416,32 @@ def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols):
     demodulated_symbols = np.array([demodulated_symbols0[:final_len], demodulated_symbols1[:final_len]])
 
     return source_symbols, processed_symbols, demodulated_symbols
+
+
+
+def estimate_snr(rx_symbols, Modbits, tx_symbols):
+    if(Modbits==2):
+        tx_symbols = tx_symbols/np.sqrt(2)
+    elif(Modbits==4):
+        tx_symbols = tx_symbols/np.sqrt(10)
+    elif(Modbits==6):
+        tx_symbols = tx_symbols/np.sqrt(42)
+    elif(Modbits==8):
+        tx_symbols = tx_symbols/np.sqrt(170)
+
+    # Signal power (mean power of the ideal symbols)
+    signal_power0 = np.mean(np.abs(tx_symbols[0])**2)
+    # Noise power (mean squared error)
+    noise_power0 = np.mean(np.abs(rx_symbols[0] - tx_symbols[0])**2)
+    # SNR in dB
+    snr_db0 = 10 * np.log10(signal_power0 / noise_power0)
+
+    # Signal power (mean power of the ideal symbols)
+    signal_power1 = np.mean(np.abs(tx_symbols[1])**2)
+    # Noise power (mean squared error)
+    noise_power1 = np.mean(np.abs(rx_symbols[1] - tx_symbols[1])**2)
+    # SNR in dB
+    snr_db1 = 10 * np.log10(signal_power1 / noise_power1)
+
+    print('SNR_dB Pol0 Estimate:', snr_db0)
+    print('SNR_dB Pol1 Estimate:', snr_db1)
