@@ -14,6 +14,7 @@ if(p.toggle.toggle_PAS==False):
     np.random.seed(1)
     original_bits = f.generate_original_bits(p.Mod_param.num_symbols, p.Mod_param.Modbits, p.Mod_param.NPol) #NPol-dimensional array
 else:
+    np.random.seed(1)
     original_bits = np.random.randint(0, 2, size= p.PAS_param.k*p.PAS_param.blocks*2*p.Mod_param.NPol)
     original_bits = original_bits.reshape((2,len(original_bits)//2))
 

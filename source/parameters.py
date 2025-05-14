@@ -31,7 +31,7 @@ class laser_paramX:
         self.theta = 0
 
 class toggleX:
-    def __init__(self, toggle_RRC, toggle_AWGNnoise, toggle_phasenoise, toggle_phasenoisecompensation, toggle_plotuncompensatedphase, toggle_ploterrorindexes, toggle_BPS, toggle_DE, toggle_frequencyrecovery, toggle_CD, toggle_NL, toggle_CD_compensation, toggle_AIR, toggle_adaptive_equalisation, toggle_PAS, AIR_type):
+    def __init__(self, toggle_RRC, toggle_AWGNnoise, toggle_phasenoise, toggle_phasenoisecompensation, toggle_plotuncompensatedphase, toggle_ploterrorindexes, toggle_BPS, toggle_DE, toggle_frequencyrecovery, toggle_CD, toggle_NL, toggle_CD_compensation, toggle_AIR, toggle_adaptive_equalisation,toggle_real_adaptive_equalisation, toggle_PAS, AIR_type):
         self.toggle_RRC = toggle_RRC
         self.toggle_AWGNnoise = toggle_AWGNnoise
         self.toggle_phasenoise = toggle_phasenoise
@@ -46,6 +46,7 @@ class toggleX:
         self.toggle_CD_compensation = toggle_CD_compensation
         self.toggle_AIR = toggle_AIR
         self.toggle_adaptive_equalisation = toggle_adaptive_equalisation
+        self.toggle_real_adaptive_equalisation = toggle_real_adaptive_equalisation
         self.toggle_PAS = toggle_PAS
         self.AIR_type = AIR_type
 
@@ -68,13 +69,15 @@ class CD_paramX:
         self.NOverlap = int(ideal_NOverlap) #Given by minimum equaliser length N_CD : pg 113 CDOT graph?
 
 class AE_paramX:
-    def __init__(self, NTaps, mu ,N1, N2, Ndiscard, AE_type):
+    def __init__(self, NTaps, mu ,N1, N2, Ndiscard, AE_type, NTaps_real, mu_real):
         self.NTaps = NTaps
         self.mu = mu
         self.N1 = N1
         self.N2 = N2
         self.Ndiscard = Ndiscard
         self.AE_type = AE_type
+        self.NTaps_real = NTaps_real
+        self.mu_real = mu_real
 
 class BPS_paramX:
     def __init__(self, B, N):
@@ -133,6 +136,7 @@ toggle = toggleX(
         toggle_CD_compensation = False,
         toggle_AIR = True,
         toggle_adaptive_equalisation = True,    
+        toggle_real_adaptive_equalisation = True,
         toggle_PAS = False,
         AIR_type = 'MI'
 )
@@ -154,13 +158,18 @@ laser_param = laser_paramX(
 CD_param = CD_paramX(fibre_param.D, fibre_param.Clambda, Mod_param.Rs, fibre_param.L)
 
 AE_param = AE_paramX(
-        NTaps = 31,
+        NTaps = 27,
         mu = 1e-3,
         N1 = 5000,
         N2 = 8000,
         Ndiscard = 10000,
-        AE_type = "2x2"
+        AE_type = "2x2",
+        #For real valued AEQ
+        NTaps_real= 27,
+        mu_real = 1e-2
 )
+
+
 
 BPS_param = BPS_paramX(
         B = 64,

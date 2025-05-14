@@ -4,7 +4,7 @@ from scipy.signal import convolve #upfirdn for up/down sampling
 import time
 from scipy.fft import fft, ifft, fftshift, ifftshift
 from tqdm import tqdm
-
+from numba import jit
 
 #References: Digital Coherent Optical Systems Textbook, Matlab Code, page 38
 
@@ -806,6 +806,7 @@ def max_likelihood_decision(rx_symbols, Modbits):
 
 @benchmark(enable_benchmark)
 def decode_symbols(symbols, Modbits, NPol):
+    
     #turns symbols back to bitstream
     if(Modbits==2): #QPSK
         symbol_mapping = {
@@ -1315,7 +1316,7 @@ def IQModulator(symbols, Einput, Vpi, Bias, MaxExc, MinExc, NPol):
 
         return np.array([EOutput0, EOutput1], dtype=complex)
 
-
+# @jit(nopython=True)
 def convmtx(vector, L):
     """
     Create a convolution matrix from the input vector with length L.
@@ -1340,6 +1341,7 @@ def convmtx(vector, L):
 
 
 @benchmark(enable_benchmark)
+# @jit(nopython=True)
 def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
     #Blind Phase Search Phase compensation
     #z is received signal to derotate
@@ -2097,8 +2099,6 @@ def gaussian_window(N, std=0.5):
     return window / np.max(window)  # Normalize to peak at 1
     
 
-
-
 def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits, Modbits):
     #for one polarisaiton
     #align using autocorrelation
@@ -2138,12 +2138,12 @@ def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits
     # Ensure equal length
     min_length = min(len(aligned_source), len(aligned_processed))
 
-    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length], aligned_demod_bits[:min_length*Modbits], aligned_original_bits[:min_length*Modbits]
+    return aligned_source[:min_length], aligned_processed[:min_length], aligned_demodulated[:min_length], aligned_demod_bits[:min_length*Modbits], aligned_original_bits[:min_length*Modbits], time_shift
 
 
 def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, Modbits):
-    source_symbols0, processed_symbols0, demodulated_symbols0, demodulated_bits0, original_bits0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0], demodulated_bits[0], original_bits[0], Modbits)
-    source_symbols1, processed_symbols1, demodulated_symbols1, demodulated_bits1, original_bits1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1], demodulated_bits[1], original_bits[1], Modbits)
+    source_symbols0, processed_symbols0, demodulated_symbols0, demodulated_bits0, original_bits0, shift0 = align_symbols_1Pol(source_symbols[0], processed_symbols[0], demodulated_symbols[0], demodulated_bits[0], original_bits[0], Modbits)
+    source_symbols1, processed_symbols1, demodulated_symbols1, demodulated_bits1, original_bits1, shift1 = align_symbols_1Pol(source_symbols[1], processed_symbols[1], demodulated_symbols[1], demodulated_bits[1], original_bits[1], Modbits)
 
     final_len = min(len(source_symbols0), len(source_symbols1))
 
@@ -2155,9 +2155,25 @@ def align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, d
     original_bits = np.array([original_bits0[:final_len*Modbits], original_bits1[:final_len*Modbits]])
 
 
-    return source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits
+    return source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, shift0, shift1
 
-
+def shift(source, bits, shift0, shift1, NPol, Modbits):
+    if(NPol==1):
+        if shift0 > 0:
+            aligned_source = source[:-shift0]
+            aligned_bits = bits[:-shift0*Modbits]
+        elif shift0 < 0:
+            aligned_source = source[-shift:]
+            aligned_bits = bits[-shift0*Modbits:]
+        else:
+            aligned_source = source
+            aligned_bits = bits
+        return aligned_source, aligned_bits
+    else:
+        aligned_source0, aligned_bits0 = shift(source[0],bits[0],shift0,0,1,Modbits)
+        aligned_source1, aligned_bits1 = shift(source[1],bits[1],shift1,0,1,Modbits)
+    return np.array([aligned_source0, aligned_source1]), np.array([aligned_bits0,aligned_bits1])
+    
 
 def estimate_snr(rx_symbols, Modbits, tx_symbols):
     if(Modbits==2):
@@ -2225,6 +2241,7 @@ def MIMO_LMS_AEQ(x,d,mu,NTaps):
             w1H += mu * xH * np.conj(d1[i] - y1[i])
             w2V += mu * xV * np.conj(d2[i] - y2[i])
             w2H += mu * xH * np.conj(d2[i] - y2[i])
+
         y = np.array([y1, y2])
 
         plt.figure()
