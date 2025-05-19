@@ -2128,6 +2128,7 @@ def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits
     
     # Find peak index for time shift
     time_shift = np.argmax(autocorr)
+    print(time_shift)
     # Correct cyclic shift
     if time_shift > N // 2:
         time_shift -= N
@@ -2180,16 +2181,19 @@ def shift(source, bits, shift0, shift1, NPol, Modbits):
             aligned_source = source[:-shift0]
             aligned_bits = bits[:-shift0*Modbits]
         elif shift0 < 0:
-            aligned_source = source[-shift0:]
-            aligned_bits = bits[-shift0*Modbits:]
+            aligned_source = source[-1*shift0:]
+            aligned_bits = bits[-1*shift0*Modbits:]
         else:
             aligned_source = source
             aligned_bits = bits
+
         return aligned_source, aligned_bits
     else:
         aligned_source0, aligned_bits0 = shift(source[0],bits[0],shift0,0,1,Modbits)
         aligned_source1, aligned_bits1 = shift(source[1],bits[1],shift1,0,1,Modbits)
-    return np.array([aligned_source0, aligned_source1]), np.array([aligned_bits0,aligned_bits1])
+        final_len = min(len(aligned_source0), len(aligned_source1))
+        
+    return np.array([aligned_source0[:final_len], aligned_source1[:final_len]]), np.array([aligned_bits0[:final_len*Modbits],aligned_bits1[:final_len*Modbits]])
 
 def estimate_snr(rx_symbols, Modbits, tx_symbols,toggle_PAS):
     if(toggle_PAS==False):

@@ -40,11 +40,17 @@ def PAS_truncate(processed_rx, source_symbols, original_bits, block_len, NPol,k)
         processed_rx = processed_rx[:-trun_len]
         source_symbols = source_symbols[:-trun_len]
         original_bits = original_bits[:num_blocks*k*2] 
+
+        # processed_rx = processed_rx[trun_len:]
+        # source_symbols = source_symbols[trun_len:]
+        # original_bits = original_bits[num_blocks*k*2:] 
+        
         return processed_rx, source_symbols, original_bits
     else:
         processed_rx0, source_symbols0, original_bits0 = PAS_truncate(processed_rx[0], source_symbols[0], original_bits[0], block_len, 1, k)
         processed_rx1, source_symbols1, original_bits1 = PAS_truncate(processed_rx[1], source_symbols[1], original_bits[1], block_len, 1, k)
         return  np.array([processed_rx0,processed_rx1]), np.array([source_symbols0,source_symbols1]),np.array([original_bits0,original_bits1])
+
 
 def nCr(n, r):
     if r > n:

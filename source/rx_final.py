@@ -216,5 +216,6 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
             # SER only has meaning if Differential Encoding is NOT used 
             # Find erroneous symbol indexes
             demod_bits = f.decode_symbols(demod_symbols, Modbits, NPol) #pass in Modbits which says QPSK,16QAM or 64QAM
-    
+    if(p.toggle.toggle_PAS==False):
+        H=[]
     return demod_bits, processed_rx, demod_symbols, source_symbols, original_bits, H

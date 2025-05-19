@@ -97,7 +97,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 8,
+        Modbits = 2,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -133,14 +133,14 @@ toggle = toggleX(
         toggle_BPS = True,
         toggle_DE = False,
         toggle_freqoffset = False,
-        toggle_frequencyrecovery = False,
+        toggle_frequencyrecovery = True,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = False,    
-        toggle_real_adaptive_equalisation = False,
-        toggle_PAS = True,
+        toggle_adaptive_equalisation = True,    
+        toggle_real_adaptive_equalisation = True,
+        toggle_PAS = False,
         AIR_type = 'MI'
 )
 
@@ -166,11 +166,11 @@ AE_param = AE_paramX(
         mu = 1e-3,
         N1 = 5000,
         N2 = 8000,
-        Ndiscard = 0,
+        Ndiscard = 10000,
         AE_type = "2x2",
         #For real valued AEQ
         NTaps_real= 27,
-        mu_real = 1e-2
+        mu_real = 1e-3
 )
 
 
@@ -182,14 +182,14 @@ BPS_param = BPS_paramX(
 
 PAS_param = PAS_paramX(
         Mod_param.Modbits,
-        λ = 0.015
+        λ = 0.05
         #0, 0.01, 0.025, 0.05, 0.0625, 0.075, 0.08, 0.1, 0.15 for 16QAM 
         #0.025, 0.03125, 0.034375, 0.0375, 0.05, 0.1 for 64QAM
         #0.015 for 256QAM
 )
 
-lab_testing = False #If True, then lab_testing.py set to save bits and source symbols
+lab_testing = True #If True, then lab_testing.py set to save bits and source symbols
                     #If True, then transceiver loads in real channel output data
 save_run = False
 
-run = "PCS_16QAM_Wed_20250514_1218"
+run = "QPSK_Mon_20250519_1431"

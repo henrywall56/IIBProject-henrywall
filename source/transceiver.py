@@ -112,29 +112,49 @@ else: #processing channel output
         original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_Pol1_{run}.csv"))
         original_bits = np.array([original_bits0,original_bits1])
 
-    channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"X_D_DualPol.mat"))
-    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"DualPol.mat"))
+    #Weds/Thurs 14/15 Data:
+    # channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"X_D_DualPol.mat"))
+    # matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"DualPol.mat"))
+    # source_symbols_dict = scipy.io.loadmat(os.path.join(source_symbols_save_dir, f"source_symbols_{run}.mat"))
+
+    # Monday 19 Data:
+    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"matlab.mat"))
     source_symbols_dict = scipy.io.loadmat(os.path.join(source_symbols_save_dir, f"source_symbols_{run}.mat"))
 
-    if(p.Mod_param.NPol==1):
-        #channel_output = np.array(channel_output_dict["X_payload"].squeeze())
-        channel_output = np.array(channel_output_dict["X"][:,0].squeeze())
-        channel_output = channel_output[2048:]
+    if(p.Mod_param.NPol==1):    
+    #     #channel_output = np.array(channel_output_dict["X_payload"].squeeze())
+    #     channel_output = np.array(channel_output_dict["X"][:,0].squeeze())
+    #     channel_output = channel_output[2048:]
         nopremphasis_source_symbols = np.array(matlab_objects_dict["SignalX_nopre"][::2].squeeze())
         source_symbols = np.array(source_symbols_dict["source"][0,:].squeeze())
-        Target_Signal = np.array(channel_output_dict["D"][:,0].squeeze())
+        # Target_Signal = np.array(channel_output_dict["D"][:,0].squeeze())
 
     else:
-        # channel_output0 = channel_output_dict["X_payload"].squeeze()
-        # channel_output1 = channel_output_dict["Y_payload"].squeeze()
-        channel_output0 = channel_output_dict["X"][:,0].squeeze()
-        channel_output1 = channel_output_dict["X"][:,1].squeeze()
+    #     # channel_output0 = channel_output_dict["X_payload"].squeeze()
+    #     # channel_output1 = channel_output_dict["Y_payload"].squeeze()
+
+        #Weds/Thurs 14/15 Data:
+        # channel_output0 = channel_output_dict["X"][:,0].squeeze()
+        # channel_output1 = channel_output_dict["X"][:,1].squeeze()
+        # channel_output0 = channel_output0[2048:]
+        # channel_output1 = channel_output1[2048:] 
+        # channel_output = np.array([channel_output0, channel_output1])
+        # source_symbols = np.array([source_symbols_dict["source"][0,:].squeeze(),source_symbols_dict["source"][1,:].squeeze()])
+        # Target_Signal = np.array([channel_output_dict["D"][:,0].squeeze(),channel_output_dict["D"][:,1].squeeze()])
+
+        nopremphasis_source_symbols = np.array([matlab_objects_dict["SignalX_nopre"][::2].squeeze(),matlab_objects_dict["SignalY_nopre"][::2].squeeze()])
+
+        #Monday 19 Data:
+        channel_output0 = matlab_objects_dict["X_payload"].squeeze()
+        channel_output1 = matlab_objects_dict["Y_payload"].squeeze()
         channel_output0 = channel_output0[2048:]
         channel_output1 = channel_output1[2048:] 
         channel_output = np.array([channel_output0, channel_output1])
-        nopremphasis_source_symbols = np.array([matlab_objects_dict["SignalX_nopre"][::2].squeeze(),matlab_objects_dict["SignalY_nopre"][::2].squeeze()])
         source_symbols = np.array([source_symbols_dict["source"][0,:].squeeze(),source_symbols_dict["source"][1,:].squeeze()])
-        Target_Signal = np.array([channel_output_dict["D"][:,0].squeeze(),channel_output_dict["D"][:,1].squeeze()])
+        if(p.toggle.toggle_PAS==False):
+            Target_Signal = np.array([matlab_objects_dict["D"][:,0].squeeze(),matlab_objects_dict["D"][:,1].squeeze()])
+        else:
+            Target_Signal = np.array([matlab_objects_dict["TargetSignalX"].squeeze(),matlab_objects_dict["TargetSignalY"].squeeze()])
 
     
     # fig5, axs5 = plt.subplots(1,2, figsize=(15,6.5))
@@ -202,7 +222,13 @@ else: #processing channel output
         source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, _,_ = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, p.Mod_param.Modbits)
 
     if(p.Mod_param.NPol==2):
-        snr_db0, snr_db1, _ = f.estimate_snr(processed_symbols[:,p.AE_param.NTaps:], p.Mod_param.Modbits, source_symbols[:,p.AE_param.NTaps:], p.toggle.toggle_PAS)
+        if(p.toggle.toggle_PAS==False): #Truncate first Ndiscard symbols
+            original_bits = original_bits[:,p.AE_param.Ndiscard*p.Mod_param.Modbits:]
+            demodulated_bits = demodulated_bits[:,p.AE_param.Ndiscard*p.Mod_param.Modbits:]
+            source_symbols =source_symbols[:,p.AE_param.Ndiscard:]
+            demodulated_symbols = demodulated_symbols[:,p.AE_param.Ndiscard:]
+            processed_symbols = processed_symbols[:,p.AE_param.Ndiscard:]
+        snr_db0, snr_db1, _ = f.estimate_snr(processed_symbols, p.Mod_param.Modbits, source_symbols, p.toggle.toggle_PAS)
         p.fibre_param.snr_db  = (snr_db0+snr_db1)/2
         if(p.toggle.toggle_PAS==False):
             H=[]
