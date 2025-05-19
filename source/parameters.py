@@ -97,7 +97,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 4,
+        Modbits = 8,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -113,7 +113,7 @@ fibre_param = fibre_paramX(
         L=100*1e3, 
         D=17, 
         Clambda=1550/1e9,
-        snr_db = 13 #per symbol
+        snr_db = 17 #per symbol
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
@@ -182,9 +182,9 @@ BPS_param = BPS_paramX(
 
 PAS_param = PAS_paramX(
         Mod_param.Modbits,
-        λ = 0.05
-        #0.01, 0.05, 0.08, 0.1, 0.15 for 16QAM 
-        #0.05 for 64QAM
+        λ = 0.015
+        #0, 0.01, 0.025, 0.05, 0.0625, 0.075, 0.08, 0.1, 0.15 for 16QAM 
+        #0.025, 0.03125, 0.034375, 0.0375, 0.05, 0.1 for 64QAM
         #0.015 for 256QAM
 )
 
