@@ -174,6 +174,7 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
         else:
             _1 = np.zeros((2,source_symbols.shape[1]))
             _2 = np.zeros((2,source_symbols.shape[1]*p.Mod_param.Modbits))
+
             source_symbols, processed_rx, _, _, original_bits, _,_ = f.align_symbols_2Pol(source_symbols, processed_rx, _1, _2, original_bits, p.Mod_param.Modbits)
 
         if(NPol==1):
@@ -185,7 +186,8 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
             demod_symbols, demod_bits, HI0, HQ0 = pas.PAS_decoder(processed_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.N, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
             H = [HI0, HQ0]
         elif(NPol==2):
-            processed_rx, source_symbols, original_bits = pas.PAS_truncate(processed_rx, source_symbols, original_bits, p.PAS_param.N, p.Mod_param.NPol, p.PAS_param.k)
+            if(p.lab_testing==True):
+                processed_rx, source_symbols, original_bits = pas.PAS_truncate(processed_rx, source_symbols, original_bits, p.PAS_param.N, p.Mod_param.NPol, p.PAS_param.k)
             _,_, p.PAS_param.sigma = f.estimate_snr(processed_rx, Modbits, source_symbols, p.toggle.toggle_PAS)
             #Maybe check if estimating sigma correctly
             p.PAS_param.blocks = processed_rx.shape[1]//p.PAS_param.N

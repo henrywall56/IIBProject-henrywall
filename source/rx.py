@@ -5,7 +5,7 @@ import PAS.PAS_architecture as pas
 import DDPhaseRecoveryTesting as dd
 import parameters as p
 
-def rx(rx, target_signal):
+def rx(rx, source_symbols):
 
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
@@ -74,6 +74,8 @@ def rx(rx, target_signal):
 
     frequency_recovered = f.frequency_recovery(downsampled_rx, p.Mod_param.Rs, NPol, p.toggle.toggle_frequencyrecovery)
     
+    frequency_recovered = np.array([frequency_recovered[0]/np.sqrt(np.mean(np.abs(frequency_recovered[0])**2)), frequency_recovered[1]/np.sqrt(np.mean(np.abs(frequency_recovered[1])**2))])
+
     if(p.toggle.toggle_BPS==True):
         print('--------------------------------------')
         print('BPS parameters:')
@@ -115,9 +117,11 @@ def rx(rx, target_signal):
 
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):
+            _,_, p.PAS_param.sigma = f.estimate_snr(Phase_Noise_compensated_rx, Modbits, source_symbols, p.toggle.toggle_PAS) #need to update this function for 1Pol
             demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
             H = [HI0, HQ0]
         elif(NPol==2):
+            _,_, p.PAS_param.sigma = f.estimate_snr(Phase_Noise_compensated_rx, Modbits, source_symbols, p.toggle.toggle_PAS) #need to update this function for 1Pol
             demod_symbols0, demod_bits0, HI0, HQ0 = pas.PAS_decoder(Phase_Noise_compensated_rx[0], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
             demod_symbols1, demod_bits1, HI1, HQ1 = pas.PAS_decoder(Phase_Noise_compensated_rx[1], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
             demod_bits = np.array([demod_bits0,demod_bits1])

@@ -559,6 +559,49 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
             #     print('AIR1:', AIR1,'bits/symbol')
             #     AIR = (AIR0+AIR1)/2
 
+                # HI0 = H[0][0]
+                # HQ0 = H[0][1]
+                # HI1 = H[1][0]
+                # HQ1 = H[1][1]
+                # m = len(HI0)
+
+                # Cpas = p.PAS_param.C
+                # sumC = np.sum(Cpas)*2 #negative values too, when Cpas only has positive amplitudes
+                # P = np.zeros(len(Cpas))
+                # H=0
+                # for i in range(len(Cpas)):
+                #     P[i] = Cpas[i]/sumC    
+                #     if(P[i]!=0):
+                #         H += -1*P[i]*np.log2(P[i])
+                # H *= 2 #For negative values too
+                
+                # GMI_0_I = 0
+                # for i in range(m):
+                #     GMI_0_I += HI0[i]
+                # GMI_0_I = H - GMI_0_I
+                
+                # GMI_0_Q = 0
+                # for i in range(m):
+                #     GMI_0_Q += HQ0[i]
+                # GMI_0_Q = H - GMI_0_Q
+
+                # GMI_1_I = 0
+                # for i in range(m):
+                #     GMI_1_I += HI1[i]
+                # GMI_1_I = H - GMI_1_I
+
+                # GMI_1_Q = 0
+                # for i in range(m):
+                #     GMI_1_Q += HQ1[i]
+                # GMI_1_Q = H - GMI_1_Q
+
+                # GMI_0 = GMI_0_I + GMI_0_Q
+                # GMI_1 = GMI_1_I + GMI_1_Q
+
+                # print('AIR0:',GMI_0,'bits/symbol') 
+                # print('AIR1:', GMI_1,'bits/symbol')
+                # AIR = (GMI_0+GMI_1)/2
+
                 HI0 = H[0][0]
                 HQ0 = H[0][1]
                 HI1 = H[1][0]
@@ -605,7 +648,6 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
                 print('AIR0:',GMI_0,'bits/symbol') 
                 print('AIR1:', GMI_1,'bits/symbol')
                 AIR = (GMI_0+GMI_1)/2
-
 
 
         else:

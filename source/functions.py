@@ -656,6 +656,7 @@ def add_noise(signal, snr_db, sps, Modbits, NPol, toggle_AWGNnoise): #SNR PER SY
             snr = 10 ** (snr_db / 10) #dB to linear (10 since power)
             stdev0= np.sqrt(np.mean(abs(signal[0])**2)*sps/(2*snr))
             stdev1= np.sqrt(np.mean(abs(signal[1])**2)*sps/(2*snr))
+            
             noise0 = stdev0 * (np.random.randn(len(signal[0])) + 1j * np.random.randn(len(signal[0])))
             noise1 = stdev1 * (np.random.randn(len(signal[1])) + 1j * np.random.randn(len(signal[1])))
             print('sigma0',stdev0, 'sigma1', stdev1)
