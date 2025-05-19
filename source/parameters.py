@@ -97,7 +97,7 @@ class PAS_paramX:
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 2,
+        Modbits = 4,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -140,7 +140,7 @@ toggle = toggleX(
         toggle_AIR = True,
         toggle_adaptive_equalisation = True,    
         toggle_real_adaptive_equalisation = True,
-        toggle_PAS = False,
+        toggle_PAS = True,
         AIR_type = 'MI'
 )
 
@@ -192,4 +192,4 @@ lab_testing = True #If True, then lab_testing.py set to save bits and source sym
                     #If True, then transceiver loads in real channel output data
 save_run = False
 
-run = "QPSK_Mon_20250519_1431"
+run = "PCS_16QAM_Mon_20250519_1513"

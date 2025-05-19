@@ -112,7 +112,7 @@ else: #processing channel output
         original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_Pol1_{run}.csv"))
         original_bits = np.array([original_bits0,original_bits1])
 
-    #Weds/Thurs 14/15 Data:
+    # Weds/Thurs 14/15 Data:
     # channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"X_D_DualPol.mat"))
     # matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"DualPol.mat"))
     # source_symbols_dict = scipy.io.loadmat(os.path.join(source_symbols_save_dir, f"source_symbols_{run}.mat"))

@@ -2126,9 +2126,16 @@ def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits
     Y = fft(processed)
     autocorr = np.real(ifft(np.conjugate(X) * Y))
     
+    
+
     # Find peak index for time shift
     time_shift = np.argmax(autocorr)
+
+    plt.figure()
+    plt.plot(autocorr)
     print(time_shift)
+    plt.show()
+    
     # Correct cyclic shift
     if time_shift > N // 2:
         time_shift -= N
