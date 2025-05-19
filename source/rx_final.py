@@ -5,8 +5,19 @@ import PAS.PAS_architecture as pas
 import DDPhaseRecoveryTesting as dd
 import parameters as p
 from scipy.fft import fft, ifft
+import intensity_plot as ip
 
 def rx_final(rx, target_signal, source_symbols, original_bits):
+    if(p.Mod_param.NPol==1):
+        N=len(rx)//2
+        source_symbols = source_symbols[:N] #1sps
+        target_signal = target_signal[:N*2] #2sps
+        original_bits = original_bits[:N*p.Mod_param.Modbits] #1sps
+    else:
+        N = rx.shape[1]//2
+        source_symbols = source_symbols[:,:N] #1sps
+        target_signal = target_signal[:,:N*2] #2sps
+        original_bits = original_bits[:,:N*p.Mod_param.Modbits] #1sps
 
     NPol = p.Mod_param.NPol
     Modbits = p.Mod_param.Modbits
@@ -49,6 +60,8 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
         axsAE.set_ylim(0,3)
         axsAE.legend()
 
+        MIMO_LMS_2x2_rx[:,:p.AE_param.NTaps] = frequency_recovered_rx[:,:p.AE_param.NTaps]
+
     else:
         MIMO_LMS_2x2_rx = frequency_recovered_rx
     
@@ -59,6 +72,8 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
     else:
         MIMO_LMS_2x2_rx = np.array([MIMO_LMS_2x2_rx[0]/np.sqrt(np.mean(np.abs(MIMO_LMS_2x2_rx[0])**2)), MIMO_LMS_2x2_rx[1]/np.sqrt(np.mean(np.abs(MIMO_LMS_2x2_rx[1])**2))])
 
+    
+    
     if(p.toggle.toggle_BPS==True):
         print('--------------------------------------')
         print('BPS parameters:')
@@ -135,6 +150,8 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
 
             Real_LMS_2x2_rx0 = f.MIMO_2x2_with_CPR(Phase_Noise_compensated_rx[0],target_signal[0],p.AE_param.mu_real,p.AE_param.NTaps_real)
             Real_LMS_2x2_rx1 = f.MIMO_2x2_with_CPR(Phase_Noise_compensated_rx[1],target_signal[1],p.AE_param.mu_real,p.AE_param.NTaps_real)
+            Real_LMS_2x2_rx0[:p.AE_param.NTaps_real] = Phase_Noise_compensated_rx[0][:p.AE_param.NTaps_real]
+            Real_LMS_2x2_rx1[:p.AE_param.NTaps_real] = Phase_Noise_compensated_rx[1][:p.AE_param.NTaps_real]
             Real_LMS_2x2_rx = np.array([Real_LMS_2x2_rx0,Real_LMS_2x2_rx1])
             Real_LMS_2x2_rx = np.array([Real_LMS_2x2_rx[0]/np.sqrt(np.mean(np.abs(Real_LMS_2x2_rx[0])**2)), Real_LMS_2x2_rx[1]/np.sqrt(np.mean(np.abs(Real_LMS_2x2_rx[1])**2))])
 
@@ -150,14 +167,34 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
     processed_rx = f.downsample(Real_LMS_2x2_rx, 2, NPol, toggle=p.toggle.toggle_RRC)
 
     if(p.toggle.toggle_PAS==True):
+        if(p.Mod_param.NPol==1):
+            _1 = np.zeros(len(source_symbols))
+            _2 = np.zeros(len(source_symbols)*p.Mod_param.Modbits)
+            source_symbols, processed_rx, _, _, original_bits, _,_ = f.align_symbols_1Pol(source_symbols, processed_rx, _1, _2, original_bits, p.Mod_param.Modbits)
+        else:
+            _1 = np.zeros((2,source_symbols.shape[1]))
+            _2 = np.zeros((2,source_symbols.shape[1]*p.Mod_param.Modbits))
+            source_symbols, processed_rx, _, _, original_bits, _,_ = f.align_symbols_2Pol(source_symbols, processed_rx, _1, _2, original_bits, p.Mod_param.Modbits)
+
         if(NPol==1):
-            demod_symbols, demod_bits = pas.PAS_decoder(processed_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
-            
+            #Need to make sure that signal is an integer block length of signals
+            #Then update number of blocks
+            processed_rx, source_symbols, original_bits = pas.PAS_truncate(processed_rx, source_symbols, original_bits, p.PAS_param.N, p.Mod_param.NPol, p.PAS_param.k)
+            p.PAS_param.blocks = len(processed_rx)//p.PAS_param.N
+            _,_, p.PAS_param.sigma = f.estimate_snr(processed_rx, Modbits, source_symbols, p.toggle.toggle_PAS) #need to update this function for 1Pol
+            demod_symbols, demod_bits, HI0, HQ0 = pas.PAS_decoder(processed_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.N, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            H = [HI0, HQ0]
         elif(NPol==2):
-            demod_symbols0, demod_bits0 = pas.PAS_decoder(processed_rx[0], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
-            demod_symbols1, demod_bits1 = pas.PAS_decoder(processed_rx[1], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            processed_rx, source_symbols, original_bits = pas.PAS_truncate(processed_rx, source_symbols, original_bits, p.PAS_param.N, p.Mod_param.NPol, p.PAS_param.k)
+            _,_, p.PAS_param.sigma = f.estimate_snr(processed_rx, Modbits, source_symbols, p.toggle.toggle_PAS)
+            #Maybe check if estimating sigma correctly
+            p.PAS_param.blocks = processed_rx.shape[1]//p.PAS_param.N
+
+            demod_symbols0, demod_bits0, HI0, HQ0 = pas.PAS_decoder(processed_rx[0], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            demod_symbols1, demod_bits1, HI1, HQ1 = pas.PAS_decoder(processed_rx[1], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
             demod_bits = np.array([demod_bits0,demod_bits1])
             demod_symbols = np.array([demod_symbols0,demod_symbols1])
+            H = [[HI0, HQ0], [HI1, HQ1]]
 
     elif(p.toggle.toggle_DE==True):
         if(NPol==1):
@@ -169,7 +206,6 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
     else:
         if(NPol==1):
             demod_symbols = f.max_likelihood_decision(processed_rx, Modbits) #pass in Modbits which says QPSK, 16QAM or 64QAM
-            print("demod symb",demod_symbols)
             demod_bits = f.decode_symbols(demod_symbols, Modbits, NPol) #pass in Modbits which says QPSK, 16QAM or 64QAM
         elif(NPol==2):
             demod_symbols0 = f.max_likelihood_decision(processed_rx[0], Modbits) #pass in Modbits which says QPSK, 16QAM or 64QAM
@@ -179,4 +215,4 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
             # Find erroneous symbol indexes
             demod_bits = f.decode_symbols(demod_symbols, Modbits, NPol) #pass in Modbits which says QPSK,16QAM or 64QAM
     
-    return demod_bits, processed_rx, demod_symbols, source_symbols, original_bits
+    return demod_bits, processed_rx, demod_symbols, source_symbols, original_bits, H

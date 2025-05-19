@@ -4,6 +4,8 @@ from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
 import math
+from scipy.special import expit
+#expit function computes 1/(1+np.exp(-llr)) without overflow issues
 
 testing=False
 if(testing==False):
@@ -26,6 +28,21 @@ else:
     sys.path.append(source_dir)
     import functions as f
 #Probabilistic Amplitude Shaping Architecture
+
+def PAS_truncate(processed_rx, source_symbols, original_bits, block_len, NPol,k):
+    if(NPol==1):
+        N = len(source_symbols)
+        trun_len = N%block_len
+        num_blocks = N//block_len
+
+        processed_rx = processed_rx[:-trun_len]
+        source_symbols = source_symbols[:-trun_len]
+        original_bits = original_bits[:num_blocks*k*2] 
+        return processed_rx, source_symbols, original_bits
+    else:
+        processed_rx0, source_symbols0, original_bits0 = PAS_truncate(processed_rx[0], source_symbols[0], original_bits[0], block_len, 1, k)
+        processed_rx1, source_symbols1, original_bits1 = PAS_truncate(processed_rx[1], source_symbols[1], original_bits[1], block_len, 1, k)
+        return  np.array([processed_rx0,processed_rx1]), np.array([source_symbols0,source_symbols1]),np.array([original_bits0,original_bits1])
 
 def nCr(n, r):
     if r > n:
@@ -168,15 +185,19 @@ def PAS_signs(A, Modbits, LDPC_encoder):
         return X
     
 def LLR(Y, Modbits, λ, sigma, blocks, norm):
+    N = len(Y)
     Y = Y.reshape((blocks,Y.shape[0]//blocks))
+    epsilon = 1e-20 #to protect when finding entropy
 
     if(Modbits==4):
-        
         X_0_0 = np.array([1,3])/np.sqrt(norm) #Set of symbols that have 0 at the 0th bit level
         X_0_1 = np.array([-3,-1])/np.sqrt(norm) #Set of symbols that have 1 at the 0th bit level
         X_1_0 = np.array([-1,1])/np.sqrt(norm) #Set of symbols that have 0 at the 1th bit level
         X_1_1 = np.array([-3,3])/np.sqrt(norm) #Set of symbols that have 1 at the 1th bit level
         LLR = []
+        H_0 = 0 #Entropy for performance metrics H(B_0|Y)
+        H_1 = 0 #Entropy for performance metrics H(B_1|Y)
+
         for i in range(blocks):
             LLR_ampli = []
             LLR_signsi = []
@@ -186,10 +207,24 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
                 llr = ((x0_0-x0_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x0_0**2-x0_1**2)
                 LLR_signsi.append(llr)
 
+                P_B0_0_Y = expit(llr) #P(B_0 = 0 | Y=y)
+                P_B0_1_Y = 1 - P_B0_0_Y #P(B_0 = 1 | Y=y)
+                P_B0_0_Y = np.clip(P_B0_0_Y, epsilon, 1 - epsilon)
+                P_B0_1_Y = np.clip(P_B0_1_Y, epsilon, 1 - epsilon)
+                H_0 += -1*P_B0_0_Y*np.log2(P_B0_0_Y)
+                H_0 += -1*P_B0_1_Y*np.log2(P_B0_1_Y)
+
                 x1_0 = X_1_0[np.argmax(np.exp(-1*((y-X_1_0)**2/(2*sigma**2))-λ*X_1_0**2))]
                 x1_1 = X_1_1[np.argmax(np.exp(-1*((y-X_1_1)**2/(2*sigma**2))-λ*X_1_1**2))]
                 llr = ((x1_0-x1_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x1_0**2-x1_1**2)
                 LLR_ampli.append(llr)
+
+                P_B1_0_Y = expit(llr) #P(B_1 = 0 | Y=y)
+                P_B1_1_Y = 1 - P_B1_0_Y #P(B_1 = 1 | Y=y)
+                P_B1_0_Y = np.clip(P_B1_0_Y, epsilon, 1 - epsilon)
+                P_B1_1_Y = np.clip(P_B1_1_Y, epsilon, 1 - epsilon)
+                H_1 += -1*P_B1_0_Y*np.log2(P_B1_0_Y)
+                H_1 += -1*P_B1_1_Y*np.log2(P_B1_1_Y)
 
             LLRi = []
             for llr in LLR_ampli:
@@ -197,6 +232,10 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
             for llr in LLR_signsi:
                 LLRi.append(llr)
             LLR.append(LLRi)
+
+        H_0 = H_0/N #Empirical average 
+        H_1 = H_1/N
+        H = np.array([H_0,H_1])
         
     elif(Modbits==6):
         
@@ -207,6 +246,11 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
         X_2_0 = np.array([-5,-3,3,5])/np.sqrt(norm) #Set of symbols that have a 0 at the 2th bit level
         X_2_1= np.array([-7,-1,1,7])/np.sqrt(norm) #Set of symbols that have a 1 at the 2th bit level
         LLR=[]
+
+        H_0 = 0 #Entropy for performance metrics H(B_0|Y)
+        H_1 = 0 #Entropy for performance metrics H(B_1|Y)
+        H_2 = 0 #Entropy for performance metrics H(B_2|Y)
+
         for i in range(blocks):
             LLR_ampli = []
             LLR_signsi = []
@@ -216,21 +260,49 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
                 llr = ((x0_0-x0_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x0_0**2-x0_1**2)
                 LLR_signsi.append(llr)
 
+                P_B0_0_Y = expit(llr) #P(B_0 = 0 | Y=y)
+                P_B0_1_Y = 1 - P_B0_0_Y #P(B_0 = 1 | Y=y)
+                P_B0_0_Y = np.clip(P_B0_0_Y, epsilon, 1 - epsilon)
+                P_B0_1_Y = np.clip(P_B0_1_Y, epsilon, 1 - epsilon)
+                H_0 += -1*P_B0_0_Y*np.log2(P_B0_0_Y)
+                H_0 += -1*P_B0_1_Y*np.log2(P_B0_1_Y)
+                
+
                 x1_0 = X_1_0[np.argmax(np.exp(-1*((y-X_1_0)**2/(2*sigma**2))-λ*X_1_0**2))]
                 x1_1 = X_1_1[np.argmax(np.exp(-1*((y-X_1_1)**2/(2*sigma**2))-λ*X_1_1**2))]
                 llr = ((x1_0-x1_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x1_0**2-x1_1**2)
                 LLR_ampli.append(llr)
 
+                P_B1_0_Y = expit(llr) #P(B_1 = 0 | Y=y)
+                P_B1_1_Y = 1 - P_B1_0_Y #P(B_1 = 1 | Y=y)
+                P_B1_0_Y = np.clip(P_B1_0_Y, epsilon, 1 - epsilon)
+                P_B1_1_Y = np.clip(P_B1_1_Y, epsilon, 1 - epsilon)
+                H_1 += -1*P_B1_0_Y*np.log2(P_B1_0_Y)
+                H_1 += -1*P_B1_1_Y*np.log2(P_B1_1_Y)
+
                 x2_0 = X_2_0[np.argmax(np.exp(-1*((y-X_2_0)**2/(2*sigma**2))-λ*X_2_0**2))]
                 x2_1 = X_2_1[np.argmax(np.exp(-1*((y-X_2_1)**2/(2*sigma**2))-λ*X_2_1**2))]
                 llr = ((x2_0-x2_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x2_0**2-x2_1**2)
                 LLR_ampli.append(llr)
+
+                P_B2_0_Y = expit(llr) #P(B_2 = 0 | Y=y)
+                P_B2_1_Y = 1 - P_B2_0_Y #P(B_2 = 1 | Y=y)
+                P_B2_0_Y = np.clip(P_B2_0_Y, epsilon, 1 - epsilon)
+                P_B2_1_Y = np.clip(P_B2_1_Y, epsilon, 1 - epsilon)
+                H_2 += -1*P_B2_0_Y*np.log2(P_B2_0_Y)
+                H_2 += -1*P_B2_1_Y*np.log2(P_B2_1_Y)
+
             LLRi = []
             for llr in LLR_ampli:
                 LLRi.append(llr)
             for llr in LLR_signsi:
                 LLRi.append(llr)
             LLR.append(LLRi)
+        
+        H_0 = H_0/N #Empirical average 
+        H_1 = H_1/N
+        H_2 = H_2/N
+        H = np.array([H_0,H_1,H_2])
         
     elif(Modbits==8):
         
@@ -243,6 +315,12 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
         X_3_0 = np.array([-15,-9,-7,-1,1,7,9,15])/np.sqrt(norm) #Set of symbols that have a 0 at the 3th bit level
         X_3_1 = np.array([-13,-11,-5,-3,3,5,11,13])/np.sqrt(norm) #Set of symbols that have a 1 at the 3th bit level
         LLR=[]
+
+        H_0 = 0 #Entropy for performance metrics H(B_0|Y)
+        H_1 = 0 #Entropy for performance metrics H(B_1|Y)
+        H_2 = 0 #Entropy for performance metrics H(B_2|Y)
+        H_3 = 0 #Entropy for performance metrics H(B_3|Y)
+
         for i in range(blocks):
             LLR_ampli = []
             LLR_signsi = []
@@ -252,20 +330,48 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
                 llr = ((x0_0-x0_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x0_0**2-x0_1**2)
                 LLR_signsi.append(llr)
 
+                P_B0_0_Y = expit(llr) #P(B_0 = 0 | Y=y)
+                P_B0_1_Y = 1 - P_B0_0_Y #P(B_0 = 1 | Y=y)
+                P_B0_0_Y = np.clip(P_B0_0_Y, epsilon, 1 - epsilon)
+                P_B0_1_Y = np.clip(P_B0_1_Y, epsilon, 1 - epsilon)
+                H_0 += -1*P_B0_0_Y*np.log2(P_B0_0_Y)
+                H_0 += -1*P_B0_1_Y*np.log2(P_B0_1_Y)
+
                 x1_0 = X_1_0[np.argmax(np.exp(-1*((y-X_1_0)**2/(2*sigma**2))-λ*X_1_0**2))]
                 x1_1 = X_1_1[np.argmax(np.exp(-1*((y-X_1_1)**2/(2*sigma**2))-λ*X_1_1**2))]
                 llr = ((x1_0-x1_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x1_0**2-x1_1**2)
                 LLR_ampli.append(llr)
+
+                P_B1_0_Y = expit(llr) #P(B_1 = 0 | Y=y)
+                P_B1_1_Y = 1 - P_B1_0_Y #P(B_1 = 1 | Y=y)
+                P_B1_0_Y = np.clip(P_B1_0_Y, epsilon, 1 - epsilon)
+                P_B1_1_Y = np.clip(P_B1_1_Y, epsilon, 1 - epsilon)
+                H_1 += -1*P_B1_0_Y*np.log2(P_B1_0_Y)
+                H_1 += -1*P_B1_1_Y*np.log2(P_B1_1_Y)
 
                 x2_0 = X_2_0[np.argmax(np.exp(-1*((y-X_2_0)**2/(2*sigma**2))-λ*X_2_0**2))]
                 x2_1 = X_2_1[np.argmax(np.exp(-1*((y-X_2_1)**2/(2*sigma**2))-λ*X_2_1**2))]
                 llr = ((x2_0-x2_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x2_0**2-x2_1**2)
                 LLR_ampli.append(llr)
 
+                P_B2_0_Y = expit(llr) #P(B_2 = 0 | Y=y)
+                P_B2_1_Y = 1 - P_B2_0_Y #P(B_2 = 1 | Y=y)
+                P_B2_0_Y = np.clip(P_B2_0_Y, epsilon, 1 - epsilon)
+                P_B2_1_Y = np.clip(P_B2_1_Y, epsilon, 1 - epsilon)
+                H_2 += -1*P_B2_0_Y*np.log2(P_B2_0_Y)
+                H_2 += -1*P_B2_1_Y*np.log2(P_B2_1_Y)
+
                 x3_0 = X_3_0[np.argmax(np.exp(-1*((y-X_3_0)**2/(2*sigma**2))-λ*X_3_0**2))]
                 x3_1 = X_3_1[np.argmax(np.exp(-1*((y-X_3_1)**2/(2*sigma**2))-λ*X_3_1**2))]
                 llr = ((x3_0-x3_1)/(sigma**2))*y - (1/(2*sigma**2)+ λ)*(x3_0**2-x3_1**2)
                 LLR_ampli.append(llr)
+
+                P_B3_0_Y = expit(llr) #P(B_2 = 0 | Y=y)
+                P_B3_1_Y = 1 - P_B3_0_Y #P(B_2 = 1 | Y=y)
+                P_B3_0_Y = np.clip(P_B3_0_Y, epsilon, 1 - epsilon)
+                P_B3_1_Y = np.clip(P_B3_1_Y, epsilon, 1 - epsilon)
+                H_3 += -1*P_B3_0_Y*np.log2(P_B3_0_Y)
+                H_3 += -1*P_B3_1_Y*np.log2(P_B3_1_Y)
 
             LLRi = []
             for llr in LLR_ampli:
@@ -273,8 +379,14 @@ def LLR(Y, Modbits, λ, sigma, blocks, norm):
             for llr in LLR_signsi:
                 LLRi.append(llr)
             LLR.append(LLRi)
+
+        H_0 = H_0/N #Empirical average 
+        H_1 = H_1/N
+        H_2 = H_2/N
+        H_3 = H_3/N
+        H = np.array([H_0,H_1,H_2,H_3])
     
-    return np.array(LLR).flatten()
+    return np.array(LLR).flatten(), H
 
 def LDPC_decision(llr):
     b = [0 if j > 0 else 1 for j in llr]
@@ -387,15 +499,22 @@ def PAS_parameters(Modbits,λ):
         return 1,1,1,1
     elif(Modbits==4):
         signal_points = [1,3]
-        N_target = 901
+        if(λ==0.0 or λ==0.01 or λ==0.05 or λ==0.08 or λ==0.1 or λ==0.15):
+            N_target = 901
+            z = 75
+        else:
+            raise ValueError("Need valid λ")
+        
         const = 0
         for i in signal_points:
             const += np.exp(-λ*np.abs(i)**2)
         C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),0,0,0,0,0,0]
         N = np.sum(C)
         k = int(np.floor(math.log2(nCr(N,C[1]))))
-        LDPC_encoder = ldpc.code(standard = '802.16', rate = '1/2', z=75, ptype='A')
+        LDPC_encoder = ldpc.code(standard = '802.16', rate = '1/2', z=z, ptype='A')
         #LDPC_encoder.K should be (m-1)N = N
+        # print("KKKKK",LDPC_encoder.K)
+        # print("NNNNN",N)
 
     elif(Modbits==6):
         signal_points = [1,3,5,7]
@@ -416,7 +535,6 @@ def PAS_parameters(Modbits,λ):
         N_target = 369
         const = 0
         #*********************** REMOVE AFTER TESTING ***********************
-        λ=0.015
         for i in signal_points:
             const += np.exp(-λ*np.abs(i)**2)
         C = [int(N_target*np.exp(-λ)/const),int(N_target*np.exp(-λ*9)/const),int(N_target*np.exp(-λ*25)/const),int(N_target*np.exp(-λ*49)/const), int(N_target*np.exp(-λ*81)/const), int(N_target*np.exp(-λ*121)/const), int(N_target*np.exp(-λ*169)/const), int(N_target*np.exp(-λ*225)/const)]
@@ -431,12 +549,12 @@ def PAS_parameters(Modbits,λ):
 
 
 def PAS_decoder(Y, Modbits, λ, sigma, blocks, LDPC_encoder, k, C, norm):
-
+    
     YI = np.real(Y) #Received in-phase symbols
     YQ = np.imag(Y) #Received quadrature symbols
-
-    LLRI = LLR(YI, Modbits, λ, sigma, blocks, norm) #Calculate LLRs for each bit level of each symbol
-    LLRQ = LLR(YQ, Modbits, λ, sigma, blocks, norm)
+    
+    LLRI, HI = LLR(YI, Modbits, λ, sigma, blocks, norm) #Calculate LLRs for each bit level of each symbol
+    LLRQ, HQ = LLR(YQ, Modbits, λ, sigma, blocks, norm)
     #LLRs organised as [LLR(A1_1),...,LLR(A1_(m-1)),......,LLR(Anc_1),...,LLR(Anc_(m-1)), LLR(S1),...LLR(S_nc)] (same as codeword)
     LLRI = LLRI.reshape((blocks,LLRI.shape[0]//blocks))
     LLRQ = LLRQ.reshape((blocks,LLRQ.shape[0]//blocks))
@@ -460,12 +578,13 @@ def PAS_decoder(Y, Modbits, λ, sigma, blocks, LDPC_encoder, k, C, norm):
 
     Y_decoded = YI_decoded + 1j*YQ_decoded
 
+
     bits_decodedI = DMdecode.DMdecode(np.abs(YI_decoded), C, k, blocks) #Decode the distribution matching to the information bits
     bits_decodedQ = DMdecode.DMdecode(np.abs(YQ_decoded), C, k, blocks)
 
     bits_decoded = np.array([bit for pair in zip(bits_decodedI, bits_decodedQ) for bit in pair])
 
-    return Y_decoded, bits_decoded
+    return Y_decoded, bits_decoded, HI, HQ
 
 def PAS_barplot(X):
     symbol_counts = Counter(X)
@@ -501,10 +620,10 @@ def PAS_barplot(X):
 
 if(testing==True):
 
-    Modbits = 8
-    blocks = 1000
-    # np.random.seed(2)
-    λ = 0.03
+    Modbits = 4
+    blocks = 100
+    np.random.seed(1)
+    λ = 0.05
 
     k, N, C, LDPC_encoder = PAS_parameters(Modbits,λ)
 
@@ -512,10 +631,9 @@ if(testing==True):
     X = PAS_encoder(C, bits, k, blocks, Modbits, LDPC_encoder)
     norm = np.sum(np.abs(X)**2)/len(X)
     X=X/np.sqrt(norm)
-    print(norm)
 
     #Channel: Receive symbols Y
-    snr_db = 27
+    snr_db = 13
     sps = 1
 
     Y,sigma = f.add_noise(X, snr_db, sps, Modbits, 1, True)

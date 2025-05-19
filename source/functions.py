@@ -739,6 +739,7 @@ def RRC(span, rolloff, sps):
     return g , t
 
 @benchmark(False)
+# @jit(nopython=True)
 def max_likelihood_decision(rx_symbols, Modbits):
     #returns the closest symbols in the constellation to the inputed rx_symbols
     if(Modbits==2):
@@ -1316,7 +1317,6 @@ def IQModulator(symbols, Einput, Vpi, Bias, MaxExc, MinExc, NPol):
 
         return np.array([EOutput0, EOutput1], dtype=complex)
 
-# @jit(nopython=True)
 def convmtx(vector, L):
     """
     Create a convolution matrix from the input vector with length L.
@@ -1341,7 +1341,6 @@ def convmtx(vector, L):
 
 
 @benchmark(enable_benchmark)
-# @jit(nopython=True)
 def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
     #Blind Phase Search Phase compensation
     #z is received signal to derotate
@@ -1392,6 +1391,7 @@ def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
         if(NPol==1):
             #Phase noise estimates
             for i in tqdm(range(zBlocks.shape[1]), desc="Processing BPS"): #Over columns
+            # for i in range(zBlocks.shape[1]):
                 
                 zrot = np.tile(zBlocks[:, i][:, np.newaxis],(1,B)) * ThetaTestMatrix #ith column repeated 
                 zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1]), dtype=complex)
@@ -1417,6 +1417,7 @@ def BPS(z, Modbits, N, B, NPol, toggle_phasenoisecompensation):
         elif(NPol==2):
             #Phase noise estimates
             for i in tqdm(range(zBlocks.shape[1]), desc="Processing BPS"): #Over columns
+            # for i in range(zBlocks.shape[1]):
                 
                 zrot = np.repeat(zBlocks[:,i,:][:, np.newaxis, :], B, axis=1) * ThetaTestMatrix #ith column repeated 
                 zrot_decided = np.zeros((zrot.shape[0], zrot.shape[1], zrot.shape[2]), dtype=complex)
@@ -1746,12 +1747,28 @@ def frequency_recovery(y, Rs, NPol, toggle_frequencyrecovery):
             k = np.arange(len(y[0]))
             z0 = y[0]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
             z1 = y[1]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
-            
+
             print(f'Delta_f from frequency recovery: {Delta_f/1e9} GHz')
             return np.array([z0,z1], dtype=complex)
     else:
         return y
     
+import numpy as np
+
+def add_frequency_offset(symbols, Delta_f,sps, Rs):
+    # Delta_f: carrier frequency shift in Hz
+    # Rs: symbol rate in Baud (symbols/second)
+    T = 1 / (sps*Rs)  # Assuming that frequency recovery applied at 2sps in rx_final
+    DeltaTheta_f = -2 * np.pi * Delta_f * T
+    
+    k = np.arange(symbols.shape[1])[np.newaxis, :]  # shape (1, N)
+    print(1j * DeltaTheta_f)
+    EOut = symbols * np.exp(1j * k * DeltaTheta_f)
+    return EOut
+
+
+
+
 @benchmark(enable_benchmark)
 def add_chromatic_dispersion(symbols, sps, Rs, D, Clambda, L, NPol, toggle):
     #symbols: to be transmitted
@@ -2103,7 +2120,6 @@ def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits
     #for one polarisaiton
     #align using autocorrelation
     N = len(source)
-
     # Compute FFT-based cross-correlation
     X = fft(source)
     Y = fft(processed)
@@ -2163,7 +2179,7 @@ def shift(source, bits, shift0, shift1, NPol, Modbits):
             aligned_source = source[:-shift0]
             aligned_bits = bits[:-shift0*Modbits]
         elif shift0 < 0:
-            aligned_source = source[-shift:]
+            aligned_source = source[-shift0:]
             aligned_bits = bits[-shift0*Modbits:]
         else:
             aligned_source = source
@@ -2173,17 +2189,19 @@ def shift(source, bits, shift0, shift1, NPol, Modbits):
         aligned_source0, aligned_bits0 = shift(source[0],bits[0],shift0,0,1,Modbits)
         aligned_source1, aligned_bits1 = shift(source[1],bits[1],shift1,0,1,Modbits)
     return np.array([aligned_source0, aligned_source1]), np.array([aligned_bits0,aligned_bits1])
-    
 
-def estimate_snr(rx_symbols, Modbits, tx_symbols):
-    if(Modbits==2):
-        tx_symbols = tx_symbols/np.sqrt(2)
-    elif(Modbits==4):
-        tx_symbols = tx_symbols/np.sqrt(10)
-    elif(Modbits==6):
-        tx_symbols = tx_symbols/np.sqrt(42)
-    elif(Modbits==8):
-        tx_symbols = tx_symbols/np.sqrt(170)
+def estimate_snr(rx_symbols, Modbits, tx_symbols,toggle_PAS):
+    if(toggle_PAS==False):
+        if(Modbits==2):
+            tx_symbols = tx_symbols/np.sqrt(2)
+        elif(Modbits==4):
+            tx_symbols = tx_symbols/np.sqrt(10)
+        elif(Modbits==6):
+            tx_symbols = tx_symbols/np.sqrt(42)
+        elif(Modbits==8):
+            tx_symbols = tx_symbols/np.sqrt(170)
+    else:
+        tx_symbols = tx_symbols #Already normalised
 
     # Signal power (mean power of the ideal symbols)
     signal_power0 = np.sum(np.abs(tx_symbols[0])**2)
@@ -2201,6 +2219,9 @@ def estimate_snr(rx_symbols, Modbits, tx_symbols):
 
     print('SNR_dB Pol0 Estimate:', snr_db0)
     print('SNR_dB Pol1 Estimate:', snr_db1)
+
+    sigma = 0.5*(np.sqrt(noise_power0/(2*len(rx_symbols[0]))) + np.sqrt(noise_power1/(2*len(rx_symbols[0]))))
+    return snr_db0, snr_db1, sigma
 
 
 def MIMO_LMS_AEQ(x,d,mu,NTaps):

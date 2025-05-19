@@ -12,6 +12,7 @@ from scipy.fft import fft, ifft
 import intensity_plot as ip
 import rx_final as rx_final
 from matplotlib.ticker import MaxNLocator
+from scipy.signal import resample_poly
 
 if(p.lab_testing==False):
     if(p.toggle.toggle_PAS==False):
@@ -25,39 +26,38 @@ if(p.lab_testing==False):
 
     channel_output = channel.channel(pulse_shaped_symbols)
 
-    demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, source_symbols)
+    demodulated_bits, processed_symbols, demodulated_symbols, H = rx.rx(channel_output, source_symbols)
 
-    # if(p.Mod_param.NPol==2):
-    #     source_symbols, processed_symbols, demodulated_symbols = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols)
-
-    plot_autocorr = True
-    if(plot_autocorr==True):
-        if(p.Mod_param.NPol==1):
-            autocorr = np.real(ifft(np.conjugate(fft(source_symbols))*fft(processed_symbols)))
-            plt.figure()
-            plt.plot(autocorr)
-            plt.title('autocorrelation')
-            print('Max autocorrelation at index', np.argmax(autocorr), 'or', np.argmax(autocorr)-p.Mod_param.num_symbols)
-        else:
-            autocorrV = np.real(ifft(np.conjugate(fft(source_symbols[0]))*fft(processed_symbols[0])))
-            autocorrH = np.real(ifft(np.conjugate(fft(source_symbols[1]))*fft(processed_symbols[1])))
-            plt.figure()
-            plt.plot(autocorrV)
-            plt.title('V autocorrelation')
-            print('Max V autocorrelation at index', np.argmax(autocorrV), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-            plt.figure()    
-            plt.plot(autocorrH)
-            plt.title('H autocorrelation')
-            print('Max H autocorrelation at index', np.argmax(autocorrH), 'or', np.argmax(autocorrV)-p.Mod_param.num_symbols)
-    # source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols)
-    #shouldn't we re-align the bits too?
-
-    BER, AIR, AIR_theoretical = pe.performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols)
-
-    print('BER:', BER)
-
+    target_signal = np.array([resample_poly(source_symbols[0], up=2, down=1), resample_poly(source_symbols[1], up=2, down=1)])
+    target_signal = np.array([target_signal[0]/(np.sqrt(np.mean(np.abs(target_signal[0])**2))), target_signal[1]/(np.sqrt(np.mean(np.abs(target_signal[1])**2)))])
+    # demodulated_bits, processed_symbols, demodulated_symbols, source_symbols, original_bits, H = rx_final.rx_final(channel_output, target_signal, source_symbols, original_bits)
+    
     if(p.Mod_param.NPol==1):
         fig, axs = plt.subplots(1, 1, figsize=(8, 8))
+        ip.get_color_constellation(processed_symbols,axs[0])
+    elif(p.Mod_param.NPol==2):
+        fig1, axs1 = plt.subplots(1,2, figsize=(15,6.5))
+        ip.get_color_constellation(processed_symbols[0],axs1[0])
+        ip.get_color_constellation(processed_symbols[1],axs1[1])
+
+    if(p.Mod_param.NPol==1):
+        source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, _,_ = f.align_symbols_1Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, p.Mod_param.Modbits)
+    else:
+        source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, _,_ = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, p.Mod_param.Modbits)
+
+    if(p.Mod_param.NPol==2):
+        snr_db0, snr_db1, _ = f.estimate_snr(processed_symbols[:,p.AE_param.NTaps:], p.Mod_param.Modbits, source_symbols[:,p.AE_param.NTaps:], p.toggle.toggle_PAS)
+        # p.fibre_param.snr_db  = (snr_db0+snr_db1)/2
+        if(p.toggle.toggle_PAS==False):
+            H=[]
+        BER, AIR, _ = pe.performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols, H)
+
+        print('BER:', BER)
+        print('AIR:', AIR)
+
+
+    if(p.Mod_param.NPol==1):
+        fig, axs = plt.subplots(1, 1, figfze=(8, 8))
         f.plot_constellation(axs, processed_symbols, title='processed', lim=2)
         if(p.toggle.toggle_PAS):
             erroneous_indexes = np.where(np.abs(source_symbols*np.sqrt(p.PAS_param.PAS_normalisation) - demodulated_symbols) > 1e-9)[0]
@@ -89,28 +89,32 @@ if(p.lab_testing==False):
         axs[1].scatter(processed_symbols[1][erroneous_indexesH].real, processed_symbols[1][erroneous_indexesH].imag, color='red', label='Errors', s=3, alpha=0.5)
 
 
+    plt.tight_layout()
+        
+    plt.show()
+
+
 else: #processing channel output
 
     # LOAD IN SYMBOLS AND ORIGINAL BITS
     run = p.run
     script_dir = os.path.dirname(os.path.abspath(__file__))
     channel_output_save_dir = os.path.join(script_dir, f"data/channel_output/{run}")
-    original_bits_save_dir = os.path.join(script_dir, f"data/original_bits/{run}")
+    original_bits_save_dir = os.path.join(script_dir,  f"data/original_bits/{run}")
     matlab_objects_save_dir = os.path.join(script_dir, f"data/matlab_objects/{run}")
     source_symbols_save_dir = os.path.join(script_dir, f"data/source_symbols/{run}")
 
 
     if(p.Mod_param.NPol==1):
-        original_bits = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"))
+        original_bits = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_Pol0_{run}.csv"))
     else:
-        original_bits0 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol0_{run}.csv"))
-        original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_0403_Pol1_{run}.csv"))
+        original_bits0 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_Pol0_{run}.csv"))
+        original_bits1 = np.loadtxt(os.path.join(original_bits_save_dir, f"original_bits_Pol1_{run}.csv"))
         original_bits = np.array([original_bits0,original_bits1])
 
     channel_output_dict = scipy.io.loadmat(os.path.join(channel_output_save_dir, f"X_D_DualPol.mat"))
-    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"QPSK_DualPol.mat"))
+    matlab_objects_dict = scipy.io.loadmat(os.path.join(matlab_objects_save_dir, f"DualPol.mat"))
     source_symbols_dict = scipy.io.loadmat(os.path.join(source_symbols_save_dir, f"source_symbols_{run}.mat"))
-
 
     if(p.Mod_param.NPol==1):
         #channel_output = np.array(channel_output_dict["X_payload"].squeeze())
@@ -151,8 +155,9 @@ else: #processing channel output
 
     print('####### EXPERIMENTAL CHANNEL OUTPUT SYMBOLS LOADED #######')
 
-    # demodulated_bits, processed_symbols, demodulated_symbols = rx.rx(channel_output, Target_Signal)
-    demodulated_bits, processed_symbols, demodulated_symbols, source_symbols, original_bits = rx_final.rx_final(channel_output, Target_Signal, source_symbols, original_bits)
+    # demodulated_bits, processed_symbols, demodulated_symbols, H = rx.rx(channel_output, Target_Signal)
+
+    demodulated_bits, processed_symbols, demodulated_symbols, source_symbols, original_bits, H = rx_final.rx_final(channel_output, Target_Signal, source_symbols, original_bits)
 
     if(p.Mod_param.NPol==1):
         fig, axs = plt.subplots(1, 1, figsize=(8, 8))
@@ -197,15 +202,17 @@ else: #processing channel output
         source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, _,_ = f.align_symbols_2Pol(source_symbols, processed_symbols, demodulated_symbols, demodulated_bits, original_bits, p.Mod_param.Modbits)
 
     if(p.Mod_param.NPol==2):
-        f.estimate_snr(processed_symbols[:,p.AE_param.NTaps:], p.Mod_param.Modbits, source_symbols[:,p.AE_param.NTaps:])
-
-        BER, AIR, _ = pe.performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols)
+        snr_db0, snr_db1, _ = f.estimate_snr(processed_symbols[:,p.AE_param.NTaps:], p.Mod_param.Modbits, source_symbols[:,p.AE_param.NTaps:], p.toggle.toggle_PAS)
+        p.fibre_param.snr_db  = (snr_db0+snr_db1)/2
+        if(p.toggle.toggle_PAS==False):
+            H=[]
+        BER, AIR, _ = pe.performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols, H)
 
         print('BER:', BER)
         print('AIR:', AIR)
 
     if(p.Mod_param.NPol==1):
-        fig, axs = plt.subplots(1, 1, figsize=(8, 8))
+        fig, axs = plt.subplots(1, 1, figfze=(8, 8))
         f.plot_constellation(axs, processed_symbols, title='processed', lim=2)
         if(p.toggle.toggle_PAS):
             erroneous_indexes = np.where(np.abs(source_symbols*np.sqrt(p.PAS_param.PAS_normalisation) - demodulated_symbols) > 1e-9)[0]

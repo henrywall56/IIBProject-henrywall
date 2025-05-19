@@ -24,14 +24,15 @@ class IQ_Mod_paramX:
         self.MaxExc = -0.5*Vpi
 
 class laser_paramX:
-    def __init__(self, Linewidth, maxDvT, laser_power):
+    def __init__(self, Linewidth, maxDvT, laser_power, freq_offset):
         self.Linewidth=Linewidth #Hz
         self.maxDvT=maxDvT
         self.laser_power=laser_power
         self.theta = 0
+        self.freq_offset = freq_offset
 
 class toggleX:
-    def __init__(self, toggle_RRC, toggle_AWGNnoise, toggle_phasenoise, toggle_phasenoisecompensation, toggle_plotuncompensatedphase, toggle_ploterrorindexes, toggle_BPS, toggle_DE, toggle_frequencyrecovery, toggle_CD, toggle_NL, toggle_CD_compensation, toggle_AIR, toggle_adaptive_equalisation,toggle_real_adaptive_equalisation, toggle_PAS, AIR_type):
+    def __init__(self, toggle_RRC, toggle_AWGNnoise, toggle_phasenoise, toggle_phasenoisecompensation, toggle_plotuncompensatedphase, toggle_ploterrorindexes, toggle_BPS, toggle_DE, toggle_freqoffset, toggle_frequencyrecovery, toggle_CD, toggle_NL, toggle_CD_compensation, toggle_AIR, toggle_adaptive_equalisation,toggle_real_adaptive_equalisation, toggle_PAS, AIR_type):
         self.toggle_RRC = toggle_RRC
         self.toggle_AWGNnoise = toggle_AWGNnoise
         self.toggle_phasenoise = toggle_phasenoise
@@ -40,6 +41,7 @@ class toggleX:
         self.toggle_ploterrorindexes = toggle_ploterrorindexes
         self.toggle_BPS = toggle_BPS
         self.toggle_DE = toggle_DE
+        self.toggle_freqoffset = toggle_freqoffset
         self.toggle_frequencyrecovery = toggle_frequencyrecovery
         self.toggle_CD = toggle_CD
         self.toggle_NL = toggle_NL
@@ -88,14 +90,14 @@ class PAS_paramX:
     def __init__(self, Modbits, λ):
         self.k, self.N, self.C, self.LDPC_encoder = pas.PAS_parameters(Modbits, λ)
         self.λ = λ
-        self.blocks = Mod_param.num_symbols//self.k
+        self.blocks = Mod_param.num_symbols//self.N
         self.sigma = 0
-        self.PAS_normalisation = 0
-
+        self.PAS_normalisation = 8.41777777777778 #Need to change if using different Modbits or λ
+        
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 2,
+        Modbits = 4,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -108,7 +110,7 @@ RRC_param = RRC_paramX(
 )
 
 fibre_param = fibre_paramX(
-        L=1000*1e3, 
+        L=100*1e3, 
         D=17, 
         Clambda=1550/1e9,
         snr_db = 10 #per symbol
@@ -130,14 +132,15 @@ toggle = toggleX(
         toggle_ploterrorindexes = False,
         toggle_BPS = True,
         toggle_DE = False,
-        toggle_frequencyrecovery = True,
+        toggle_freqoffset = False,
+        toggle_frequencyrecovery = False,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = True,    
-        toggle_real_adaptive_equalisation = True,
-        toggle_PAS = False,
+        toggle_adaptive_equalisation = False,    
+        toggle_real_adaptive_equalisation = False,
+        toggle_PAS = True,
         AIR_type = 'MI'
 )
 
@@ -151,7 +154,8 @@ maxDvT = Linewidth/(Mod_param.Rs*sps)
 laser_param = laser_paramX(
         Linewidth = Linewidth,
         maxDvT = maxDvT, 
-        laser_power = 16 #dBm
+        laser_power = 16, #dBm
+        freq_offset = 0.8e9
 )
 
 
@@ -162,7 +166,7 @@ AE_param = AE_paramX(
         mu = 1e-3,
         N1 = 5000,
         N2 = 8000,
-        Ndiscard = 10000,
+        Ndiscard = 0,
         AE_type = "2x2",
         #For real valued AEQ
         NTaps_real= 27,
@@ -178,11 +182,14 @@ BPS_param = BPS_paramX(
 
 PAS_param = PAS_paramX(
         Mod_param.Modbits,
-        λ = 0.05
+        λ = 0.0
+        #0.01, 0.05, 0.08, 0.1, 0.15 for 16QAM 
+        #0.05 for 64QAM
+        #0.015 for 256QAM
 )
 
-lab_testing = True #If true, then lab_testing.py set to save bits and source symbols
+lab_testing = False #If true, then lab_testing.py set to save bits and source symbols
                    #If true, then transceiver loads in real channel output data
 save_run = False
 
-run = "QPSK_Tue_20250513_1219"
+run = "16QAM_Wed_20250514_1149"

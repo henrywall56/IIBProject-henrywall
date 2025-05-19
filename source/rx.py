@@ -116,12 +116,13 @@ def rx(rx, target_signal):
     if(p.toggle.toggle_PAS==True):
         if(NPol==1):
             demod_symbols, demod_bits = pas.PAS_decoder(Phase_Noise_compensated_rx, Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
-            
+            H = [HI0, HQ0]
         elif(NPol==2):
-            demod_symbols0, demod_bits0 = pas.PAS_decoder(Phase_Noise_compensated_rx[0], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
-            demod_symbols1, demod_bits1 = pas.PAS_decoder(Phase_Noise_compensated_rx[1], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            demod_symbols0, demod_bits0, HI0, HQ0 = pas.PAS_decoder(Phase_Noise_compensated_rx[0], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
+            demod_symbols1, demod_bits1, HI1, HQ1 = pas.PAS_decoder(Phase_Noise_compensated_rx[1], Modbits, p.PAS_param.λ, p.PAS_param.sigma, p.PAS_param.blocks, p.PAS_param.LDPC_encoder, p.PAS_param.k, p.PAS_param.C, p.PAS_param.PAS_normalisation)
             demod_bits = np.array([demod_bits0,demod_bits1])
             demod_symbols = np.array([demod_symbols0,demod_symbols1])
+            H = [[HI0, HQ0], [HI1, HQ1]]
 
     elif(p.toggle.toggle_DE==True):
         if(NPol==1):
@@ -141,6 +142,7 @@ def rx(rx, target_signal):
             # SER only has meaning if Differential Encoding is NOT used 
             # Find erroneous symbol indexes
             demod_bits = f.decode_symbols(demod_symbols, Modbits, NPol) #pass in Modbits which says 16QAM or 64QAM
-    
-    return demod_bits, Phase_Noise_compensated_rx, demod_symbols
+    if(p.toggle.toggle_PAS==False):
+        H=[]
+    return demod_bits, Phase_Noise_compensated_rx, demod_symbols, H
 

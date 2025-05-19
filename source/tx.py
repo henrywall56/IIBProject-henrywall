@@ -29,13 +29,21 @@ def tx(original_bits):
     elif(Modbits==4):
         B=32 #Number of trial angles
         modulation_format='16-QAM'
+        if(p.toggle.toggle_PAS==True):
+            modulation_format='PCS-16-QAM'
+
     elif(Modbits==6):
         B=64 #Number of trial angles
         modulation_format='64-QAM'
+        if(p.toggle.toggle_PAS==True):
+            modulation_format='PCS-64-QAM'
+
     elif(Modbits==8):
         B=64 #Number of trial angles
         modulation_format='256-QAM'
-
+        if(p.toggle.toggle_PAS==True):
+            modulation_format='PCS-256-QAM'
+            
     L = p.fibre_param.L
 
     if(p.toggle.toggle_RRC==False):
@@ -69,6 +77,7 @@ def tx(original_bits):
             pas.PAS_barplot(PAS_symbols)
             PAS_normalisation = np.sum(abs(PAS_symbols)**2)/len(PAS_symbols)
             p.PAS_param.PAS_normalisation = PAS_normalisation
+            
             symbols = PAS_symbols/np.sqrt(PAS_normalisation)
             
         else:
@@ -80,9 +89,24 @@ def tx(original_bits):
             PAS_normalisation1 = np.sum(abs(PAS_symbols1)**2)/(len(PAS_symbols0)+len(PAS_symbols1)) 
             PAS_normalisation = PAS_normalisation0 + PAS_normalisation1
             p.PAS_param.PAS_normalisation = PAS_normalisation
+            print(PAS_normalisation,"PAS_norm")
             symbols0 = PAS_symbols0/(np.sqrt(PAS_normalisation))
             symbols1 = PAS_symbols1/(np.sqrt(PAS_normalisation)) 
             symbols = np.array([symbols0,symbols1]) #normalised to unit energy (across both polarisations)
+
+            sumC = np.sum(Cpas)*2 #negative values too, when Cpas only has positive amplitudes
+            P = np.zeros(len(Cpas))
+            H=0
+            for i in range(len(Cpas)):
+                P[i] = Cpas[i]/sumC    
+                if(P[i]!=0):
+                    H += -1*P[i]*np.log2(P[i])
+
+            for i in range(len(Cpas)): #Repeat again effectively for the negative symbols
+                P[i] = Cpas[i]/sumC    
+                if(P[i]!=0):
+                    H += -1*P[i]*np.log2(P[i])
+            # print("MB Entropy: ", H ,"bits/symbol per dimension")
 
         if(NPol==1):
             p.Mod_param.num_symbols = len(symbols)
@@ -90,15 +114,19 @@ def tx(original_bits):
             p.Mod_param.num_symbols = symbols.shape[1]
         
         print('PAS Parameters:')
-        print('Info Bits per Block k-N:       ', kpas)
+        print('Info Bits per Block k:         ', kpas)
         print('Symbols per Block N:           ', Npas)
         print('Number of Blocks:              ', p.PAS_param.blocks)
         print('Maxwell-Boltzmann Parameter λ: ', λpas)
-        print('Shaping Rate:                  ', 2*kpas/Npas, 'bits/symbol') 
+        print('Actual Shaping Rate:           ', 2*(kpas)/Npas, 'bits/symbol')
+        print('Maximum Shaping Rate:          ', 2*(kpas+Npas)/Npas, 'bits/symbol') #Maximum bits/symbol if sign bits carried information too
+        print('Entropy Rate 2H(X):            ', 2*H, 'bits/symbol') #Maximum possible rate with MB distribution
+
         print('--------------------------------------')
-        print('No. of Symbols:      ', p.Mod_param.num_symbols)
-        print('Symbol Rate:         ', Rs/1e9, 'GBaud')
-        print('Bit Rate:            ', 2*((kpas)/Npas)*Rs/1e9, 'GBit/s')
+        print('No. of Symbols:                ', p.Mod_param.num_symbols)
+        print('Symbol Rate:                   ', Rs/1e9, 'GBaud')
+        print('Bit Rate per Polarisation:     ', 2*((kpas)/Npas)*Rs/1e9, 'GBit/s')
+        print('Total Bit Rate:                ', 2*2*((kpas)/Npas)*Rs/1e9, 'GBit/s')
         print('--------------------------------------')
     
     #Pulse shaping with RRC filter

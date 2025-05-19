@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import parameters as p
 from matplotlib.ticker import MaxNLocator
 
+
 def LLR(y,x,bmap,sigma2, Modbits):
     #Not for use with differential encoding
     #Calculates the LLR's for circularly symmetric Gaussian channel.
@@ -478,7 +479,7 @@ def AIR_SDSW(x,y,Modbits):
     
     return AIR
 
-def performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols):
+def performance_metrics(original_bits, demodulated_bits, source_symbols, processed_symbols, H):
     processed_symbols0 = processed_symbols[0]/np.sqrt(np.mean(np.abs(processed_symbols[0])**2))
     processed_symbols1 = processed_symbols[1]/np.sqrt(np.mean(np.abs(processed_symbols[1])**2))
     processed_symbols = np.array([processed_symbols0,processed_symbols1])
@@ -512,12 +513,101 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
                 if(p.toggle.AIR_type=='GMI'):
                     AIR = 0.5*(AIR_SDBW(source_symbols[0], original_bits[0],processed_symbols[0], p.Mod_param.Modbits) + AIR_SDBW(source_symbols[1], original_bits[1], processed_symbols[1], p.Mod_param.Modbits))
                 elif(p.toggle.AIR_type=='MI'):
-                    print('AIR0',AIR_SDSW(source_symbols[0], processed_symbols[0], p.Mod_param.Modbits)) #TESTING
-                    print('AIR1', AIR_SDSW(source_symbols[1], processed_symbols[1], p.Mod_param.Modbits)) #TESTING
+                    print('AIR0:',AIR_SDSW(source_symbols[0], processed_symbols[0], p.Mod_param.Modbits),'bits/symbols') #TESTING
+                    print('AIR1:',AIR_SDSW(source_symbols[1], processed_symbols[1], p.Mod_param.Modbits),'bits/symbol') #TESTING
                     AIR = 0.5*(AIR_SDSW(source_symbols[0], processed_symbols[0], p.Mod_param.Modbits)+AIR_SDSW(source_symbols[1], processed_symbols[1], p.Mod_param.Modbits))
                     
             else:
-                AIR = 0 #undefined yet
+            #     HI0 = H[0][0]
+            #     HQ0 = H[0][1]
+            #     HI1 = H[1][0]
+            #     HQ1 = H[1][1]
+            #     H0 = (HI0+HQ0)/2 #Average of in-phase and quadrature for Pol 0.
+            #     H1 = (HI1+HQ1)/2 #Average of in-phase and quadrature for Pol 1.
+
+            #     m = len(H0)
+                
+            #     NGMI0 = 0
+            #     for i in range(m):
+            #         NGMI0 += (H0[i])/m
+            #     NGMI0 = 1-NGMI0
+
+            #     NGMI1 = 0
+            #     for i in range(m):
+            #         NGMI1 += (H1[i])/m
+            #     NGMI1 = 1-NGMI1
+
+            #     print("NGMI Pol 0:", NGMI0,'bits/bit')
+            #     print("NGMI Pol 1:", NGMI1,'bits/bit')
+
+
+            #     Cpas = p.PAS_param.C
+            #     sumC = np.sum(Cpas)*2 #negative values too, when Cpas only has positive amplitudes
+            #     P = np.zeros(len(Cpas))
+            #     H=0
+            #     for i in range(len(Cpas)):
+            #         P[i] = Cpas[i]/sumC    
+            #         if(P[i]!=0):
+            #             H += -1*P[i]*np.log2(P[i])
+
+            #     H*=2 #Positive and negative signs
+
+            #     AIR0 = 2*NGMI0*H
+            #     AIR1 = 2*NGMI1*H
+
+            #     print('AIR0:',AIR0,'bits/symbol') 
+            #     print('AIR1:', AIR1,'bits/symbol')
+            #     AIR = (AIR0+AIR1)/2
+
+                HI0 = H[0][0]
+                HQ0 = H[0][1]
+                HI1 = H[1][0]
+                HQ1 = H[1][1]
+                m = len(HI0)
+
+                Cpas = p.PAS_param.C
+                sumC = np.sum(Cpas) #Only positive amplitudes
+                P = np.zeros(len(Cpas))
+                H=0
+                for i in range(len(Cpas)):
+                    P[i] = Cpas[i]/sumC    
+                    if(P[i]!=0):
+                        H += -1*P[i]*np.log2(P[i])
+                
+                
+                GMI_0_I = 0
+                for i in range(1,m): #Only amplitude bits are shaped
+                    GMI_0_I += HI0[i]
+                GMI_0_I = H - GMI_0_I
+                GMI_0_I = GMI_0_I + 1 - HI0[0] #GMI of sign bit
+                
+                GMI_0_Q = 0
+                for i in range(1,m):
+                    GMI_0_Q += HQ0[i]
+                GMI_0_Q = H - GMI_0_Q
+                GMI_0_Q = GMI_0_Q + 1 - HQ0[0] 
+
+                GMI_1_I = 0
+                for i in range(1,m):
+                    GMI_1_I += HI1[i]
+                GMI_1_I = H - GMI_1_I
+                GMI_1_I = GMI_1_I + 1 - HI1[0]
+
+                GMI_1_Q = 0
+                for i in range(1,m):
+                    GMI_1_Q += HQ1[i]
+                GMI_1_Q = H - GMI_1_Q
+                GMI_1_Q = GMI_1_Q + 1 - HQ1[0]
+
+                GMI_0 = GMI_0_I + GMI_0_Q
+                GMI_1 = GMI_1_I + GMI_1_Q
+
+                print('AIR0:',GMI_0,'bits/symbol') 
+                print('AIR1:', GMI_1,'bits/symbol')
+                AIR = (GMI_0+GMI_1)/2
+
+
+
         else:
             AIR = 0
 
@@ -525,8 +615,8 @@ def performance_metrics(original_bits, demodulated_bits, source_symbols, process
     if(p.toggle.toggle_AIR==True):
         #Shannon limit 
         snr_db = p.fibre_param.snr_db
-        range = 21
-        snr_dbarr = np.arange(snr_db-range//2, snr_db+range//2,1)
+        dbrange = 21
+        snr_dbarr = np.arange(snr_db-dbrange//2, snr_db+dbrange//2,1)
         snr_dbLinarr = 10**(snr_dbarr/10)
         shannon = np.log2(1+snr_dbLinarr)
         if(p.toggle.AIR_type == 'GMI'):

@@ -40,7 +40,7 @@ def main():
     num_power = 15
     num_symbols = 2**num_power #Number of symbols in each polarisation
                                #Overwritten if PAS used
-    Modbits = 8 #2 is QPSK, 4 is 16QAM, 6 is 64QAM, 8 is 256QAM
+    Modbits = 4 #2 is QPSK, 4 is 16QAM, 6 is 64QAM, 8 is 256QAM
 
     NPol = 2 #Number of polarisations used
     
@@ -96,24 +96,24 @@ def main():
     
     #NFFT=NFFT*2 #temporary, since have issues with CD_compensation at higher Rs
 
-    snr_begin = 15
+    snr_begin = 12
 
     toggle_RRC = True #toggle RRC pulse shaping
     toggle_AWGNnoise = True
-    toggle_phasenoise = False #toggle phase noise
+    toggle_phasenoise = True #toggle phase noise
     toggle_phasenoisecompensation = False #toggle phase noise compensation
     toggle_plotuncompensatedphase = False #toggle plotting constellation before phase compensation. Note this is before downsampling if using RRC pulseshaping.
     toggle_ploterrorindexes = False #toggle plotting error indexes on phase plot
     toggle_BPS = True #toggle blind phase searching algorithm: True is BPS, False is DD Phase compensation.
     toggle_DE = False #toggle Differential Encoding
     toggle_frequencyrecovery = False #toggle Frequency Recovery
-    toggle_CD = False #Toggle Chromatic Dispersion
+    toggle_CD = True #Toggle Chromatic Dispersion
     toggle_NL = False
-    toggle_CD_compensation = False #Toggle Chromatic Dispersion Compensation
-    toggle_AIR = True
+    toggle_CD_compensation = True #Toggle Chromatic Dispersion Compensation
+    toggle_AIR = False
     toggle_adaptive_equalisation = False
     AIR_type = 'MI' #'MI' or 'GMI'
-    toggle_PAS = True
+    toggle_PAS = False
 
     if(toggle_RRC==False):
         sps=1               #overwrite sps if no RRC
@@ -137,6 +137,16 @@ def main():
         original_bits = f.generate_original_bits(num_symbols, Modbits, NPol) #NPol-dimensional array
 
         symbols = f.generate_symbols(original_bits, Modbits, NPol, toggle_DE) #NPol-dimensional array
+        if(Modbits==2):
+            symbols = symbols/np.sqrt(2)
+        if(Modbits==4):
+            symbols = symbols/np.sqrt(10)
+        if(Modbits==6):
+            symbols = symbols/np.sqrt(42)
+        if(Modbits==8):
+            symbols = symbols/np.sqrt(170)
+
+
         print('--------------------------------------')
         print('No. of Symbols:                ', num_symbols)
         print('Symbol Rate:         ', Rs/1e9, 'GBaud')
@@ -234,7 +244,7 @@ def main():
     Laser_Eoutput = Laser_Eoutput/np.sqrt(laser_norm) #normal
     
     for i, snr_dbi in enumerate(snr_db):
-        if(snr_dbi!=21):
+        if(snr_dbi!=snr_db[0]):
             continue
         
         print(f'Processing SNR {snr_dbi}')
@@ -341,8 +351,8 @@ def main():
                 demod_symbols = f.max_likelihood_decision(Phase_Noise_compensated_rx, Modbits) #pass in Modbits which says 16QAM or 64QAM
                 # SER only has meaning if Differential Encoding is NOT used 
                 # Find erroneous symbol indexes
-                erroneous_indexes = np.where(symbols != demod_symbols)[0]
-                SER[i] = np.mean(symbols != demod_symbols)
+                erroneous_indexes = np.where(np.abs(symbols-demod_symbols)>1e-5)[0]
+                SER[i] = np.mean(np.abs(symbols-demod_symbols)>1e-5)
 
                 demod_bits = f.decode_symbols(demod_symbols, Modbits, NPol) #pass in Modbits which says 16QAM or 64QAM
             elif(NPol==2):
@@ -351,9 +361,8 @@ def main():
                 demod_symbols = np.array([demod_symbols0, demod_symbols1])
                 # SER only has meaning if Differential Encoding is NOT used 
                 # Find erroneous symbol indexes
-                
-                erroneous_indexesV = np.where(demod_symbols[0]!=symbols[0])[0] #Vertical Polarisation
-                erroneous_indexesH = np.where(demod_symbols[1]!=symbols[1])[0] #Horizontal Polarisation
+                erroneous_indexesV = np.where(np.abs(symbols[0]-demod_symbols[0])>1e-5)[0] #Vertical Polarisation
+                erroneous_indexesH = np.where(np.abs(symbols[1]-demod_symbols[1])>1e-5)[0] #Horizontal Polarisation
 
                 SER[i] = (len(erroneous_indexesV)+len(erroneous_indexesH))/(NPol*num_symbols)
 
@@ -368,8 +377,12 @@ def main():
                     AIR[i] = p.AIR_SDSW(symbols, Phase_Noise_compensated_rx, Modbits)
                     
         elif(NPol==2):
-            BER[i] = (np.sum(original_bits[0] != demod_bits[0])+np.sum(original_bits[1] != demod_bits[1]))/(NPol*num_symbols*Modbits)
-            #BER[i] = np.sum(original_bits[0] != demod_bits[0])/(num_symbols*Modbits)
+            
+            # BER[i] = (np.sum(original_bits[0] != demod_bits[0])+np.sum(original_bits[1] != demod_bits[1]))/(NPol*num_symbols*Modbits)
+
+            BER[i] = (np.mean(original_bits[0] != demod_bits[0])+np.mean(original_bits[1] != demod_bits[1]))/2
+            
+        
             if(AIR_type=='GMI'):
                 AIR[i] = (p.AIR_SDBW(symbols[0], original_bits[0], Phase_Noise_compensated_rx[0], Modbits) + p.AIR_SDBW(symbols[1], original_bits[1], Phase_Noise_compensated_rx[1], Modbits))/2
             elif(AIR_type=='MI'):

@@ -2,6 +2,9 @@ import numpy as np
 import functions as f
 import matplotlib.pyplot as plt
 import parameters as p
+from scipy.fft import fft, ifft
+plt.rcParams['font.size'] = 22  # Change the font size
+plt.rcParams['font.family'] = 'Times New Roman'  # Change the font family
    
 def channel(pulse_shaped_symbols):
     #mod_param is a Modulation_param class type
@@ -44,6 +47,11 @@ def channel(pulse_shaped_symbols):
 
     Elaser, p.laser_param.theta = f.Laser(laser_power, Linewidth, sps, Rs, p.Mod_param.num_symbols, NPol, p.toggle.toggle_phasenoise) #Laser phase noise
 
+    # phase_fig, phase_axs = plt.subplots(1, 1, figsize=(8, 8))
+    # phase_axs.plot(1e9*np.arange(p.Mod_param.num_symbols*sps)/(Rs), p.laser_param.theta, color='blue', label='Phase Noise Evolution')
+    # phase_axs.set_xlabel('Time/ ns')
+    # phase_axs.set_ylabel('Phase/ radians')
+    
     Laser_Eoutput = f.IQModulator(pulse_shaped_symbols, Elaser, Vpi, Bias, MaxExc, MinExc, NPol) #laser output E field with phase noise
     if(NPol==1):
         laser_norm = np.sum(abs(Laser_Eoutput)**2)/len(Laser_Eoutput)
@@ -65,6 +73,9 @@ def channel(pulse_shaped_symbols):
     rx = CD_NL_signal #Skipping receiver front end for now
 
     #rx = f.mix_polarisation_signals(CD_NL_signal, 45)
+
+    if(p.toggle.toggle_freqoffset==True):
+        rx = f.add_frequency_offset(rx, p.laser_param.freq_offset, p.RRC_param.sps, p.Mod_param.Rs)
 
     return rx
 
