@@ -137,5 +137,6 @@ def tx(original_bits):
     print('RRC span: ', span)
     print('--------------------------------------')
     
+    print('Number of Symbols Produced:', symbols.shape)
     return pulse_shaped_symbols, symbols
 

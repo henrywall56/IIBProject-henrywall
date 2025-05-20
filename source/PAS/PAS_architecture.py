@@ -735,7 +735,7 @@ def PAS_parameters(Modbits,λ):
         elif(λ==0.1):
             N_target = 401
             z=50
-        elif(λ==0.025 or λ==0.01 or λ==0.0375 or λ==0.03125 or λ==0.034375 or λ==0.075):
+        elif(λ==0.01 or λ==0.015 or λ==0.02 or λ==0.025 or λ==0.01 or λ==0.0375 or λ==0.03125 or λ==0.034375 or λ==0.075):
             N_target = 417
             z=52
 
@@ -757,7 +757,15 @@ def PAS_parameters(Modbits,λ):
 
     elif(Modbits==8):
         signal_points = [1,3,5,7,9,11,13,15]
-        N_target = 369
+        if(λ==0.015 or λ==0.02):
+            N_target = 369
+            z=61
+        elif(λ==0.01):
+            N_target = 381
+            z=63
+        else:
+            raise ValueError("Need valid λ")
+        
         const = 0
         #*********************** REMOVE AFTER TESTING ***********************
         for i in signal_points:
@@ -766,9 +774,11 @@ def PAS_parameters(Modbits,λ):
         
         k=int(np.floor(math.log2(math.factorial(C[0]+C[1]+C[2]+C[3]+C[4]+C[5]+C[6]+C[7])/(math.factorial(C[0])*math.factorial(C[1])*math.factorial(C[2])*math.factorial(C[3])*math.factorial(C[4])*math.factorial(C[5])*math.factorial(C[6])*math.factorial(C[7])))))
         N = np.sum(C)
-        LDPC_encoder = ldpc.code(standard = '802.16', rate = '3/4', z=61, ptype='A')
+        LDPC_encoder = ldpc.code(standard = '802.16', rate = '3/4', z=z, ptype='A')
         #LDPC encoder rate is (m-1)/m = 3/4
         #LDPC_encoder.K should be (m-1)N = 3N
+        print(LDPC_encoder.K,'K')
+        print(3*N,'3N')
 
     return k, N, C, LDPC_encoder
 

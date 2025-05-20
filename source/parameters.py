@@ -7,7 +7,7 @@ class RRC_paramX:
         self.span = span
         self.sps = sps
         self.rolloff = rolloff
-        self.RRCimpulse , t1 = f.RRC(span, rolloff, sps)
+        self.RRCimpulse , self.t1 = f.RRC(span, rolloff, sps)
 
 class fibre_paramX:
     def __init__(self, L, D, Clambda, snr_db):
@@ -90,7 +90,7 @@ class PAS_paramX:
     def __init__(self, Modbits, λ):
         self.k, self.N, self.C, self.LDPC_encoder = pas.PAS_parameters(Modbits, λ)
         self.λ = λ
-        self.blocks = Mod_param.num_symbols//self.N
+        self.blocks = Mod_param.num_symbols//self.N+1 #Make sure produce more samples than num_symbols
         self.sigma = 0
         self.PAS_normalisation = 8.41777777777778 #Need to change if using different Modbits or λ
         
@@ -184,12 +184,12 @@ PAS_param = PAS_paramX(
         Mod_param.Modbits,
         λ = 0.05
         #0, 0.01, 0.025, 0.05, 0.0625, 0.075, 0.08, 0.1, 0.15 for 16QAM 
-        #0.025, 0.03125, 0.034375, 0.0375, 0.05, 0.1 for 64QAM
+        #0.01, 0.015, 0.02, 0.025, 0.03125, 0.034375, 0.0375, 0.05, 0.1 for 64QAM
         #0.015 for 256QAM
 )
 
-lab_testing = True #If True, then lab_testing.py set to save bits and source symbols
+lab_testing = False #If True, then lab_testing.py set to save bits and source symbols
                     #If True, then transceiver loads in real channel output data
 save_run = False
 
-run = "PCS_16QAM_Mon_20250519_1513"
+run = "PCS_16QAM"
