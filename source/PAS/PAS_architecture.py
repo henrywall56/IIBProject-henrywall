@@ -710,7 +710,7 @@ def PAS_parameters(Modbits,λ):
         return 1,1,1,1
     elif(Modbits==4):
         signal_points = [1,3]
-        if(λ==0.0 or λ==0.01 or λ==0.05 or λ==0.0625 or λ==0.08 or λ==0.1 or λ==0.15 or λ==0.025 or λ==0.075):
+        if(λ==0.0 or λ==0.01 or λ==0.02 or λ==0.03125 or λ==0.05 or λ==0.0625 or λ==0.08 or λ==0.1 or λ==0.11 or λ==0.15 or λ==0.025 or λ==0.075 or λ==0.0225 or λ==0.03):
             N_target = 901
             z = 75
         else:
@@ -735,9 +735,15 @@ def PAS_parameters(Modbits,λ):
         elif(λ==0.1):
             N_target = 401
             z=50
-        elif(λ==0.01 or λ==0.015 or λ==0.02 or λ==0.025 or λ==0.01 or λ==0.0375 or λ==0.03125 or λ==0.034375 or λ==0.075):
+        elif( λ==0.01 or λ==0.0125 or λ==0.01325 or λ==0.014 or λ==0.015 or λ==0.01625  or λ==0.02 or λ==0.025 or λ==0.01 or λ==0.0375 or λ==0.03125 or λ==0.034375 or λ==0.075):
             N_target = 417
             z=52
+        elif(λ==0.0175):
+            N_target = 425
+            z=53
+        elif(λ==0.0025 or λ==0.0075 or λ==0.005):
+            N_target=433
+            z=54
 
         else:
             raise ValueError("Need valid λ")
@@ -760,9 +766,12 @@ def PAS_parameters(Modbits,λ):
         if(λ==0.015 or λ==0.02):
             N_target = 369
             z=61
-        elif(λ==0.01):
-            N_target = 381
-            z=63
+        if(λ==0.0125):
+            N_target=377
+            z=62
+        elif(λ==0.01 or λ==0.0075):
+            N_target = 364
+            z=60
         else:
             raise ValueError("Need valid λ")
         

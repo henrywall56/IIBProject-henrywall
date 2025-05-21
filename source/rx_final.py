@@ -14,6 +14,8 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
         target_signal = target_signal[:N*2] #2sps
         original_bits = original_bits[:N*p.Mod_param.Modbits] #1sps
     else:
+        print(rx.shape)
+        print(source_symbols.shape)
         N = rx.shape[1]//2
         source_symbols = source_symbols[:,:N] #1sps
         target_signal = target_signal[:,:N*2] #2sps
@@ -46,6 +48,8 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
 
     if(p.toggle.toggle_adaptive_equalisation == True and NPol == 2):
         #***adaptive equalisation (2x2 MIMO, LMS with known data)***
+        
+        
         MIMO_LMS_2x2_rx = f.MIMO_LMS_AEQ(frequency_recovered_rx,target_signal,p.AE_param.mu,p.AE_param.NTaps)
         
         print('--------------------------------------')
@@ -65,6 +69,17 @@ def rx_final(rx, target_signal, source_symbols, original_bits):
     else:
         MIMO_LMS_2x2_rx = frequency_recovered_rx
     
+    if(p.lab_testing==True and p.toggle.toggle_PAS==True):
+        #Truncate off first n blocks (AEQ converges)
+        n = 15
+        block_len_N = p.PAS_param.N*n
+        block_len_K = p.PAS_param.k*n
+        MIMO_LMS_2x2_rx = MIMO_LMS_2x2_rx[:,block_len_N*2:] #2sps
+        target_signal = target_signal[:,block_len_N*2:] #2sps
+        source_symbols = source_symbols[:,block_len_N:] #1sps
+        original_bits = original_bits[:,block_len_K*2:]
+
+
     #Still 2sps
     #Normalise:
     if(NPol==1):

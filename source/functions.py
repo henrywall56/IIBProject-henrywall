@@ -1721,7 +1721,7 @@ def frequency_recovery(y, Rs, NPol, toggle_frequencyrecovery):
 
             # Shift the zero frequency component to the center
             SignalSpectrum = np.fft.fftshift(np.abs(spectrum))
-
+            
             max_index = np.argmax(SignalSpectrum)  # Find the index of the maximum value
             Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
 
@@ -1734,16 +1734,21 @@ def frequency_recovery(y, Rs, NPol, toggle_frequencyrecovery):
             f = np.arange(-1/2 + 1/len(y[0]), 1/2, 1/len(y[0]))*Rs
             Ts = 1/Rs
 
-            signal_power_4 = y[0]** 4
+            # signal_power_4 = y[0]** 4
+            signal_power_4 = y[0] #Only use For Tues 20/5 Results
 
             # Compute the FFT and take the absolute value
             spectrum = np.fft.fft(signal_power_4)
 
             # Shift the zero frequency component to the center
             SignalSpectrum = np.fft.fftshift(np.abs(spectrum))
-
+            plt.figure()
+            plt.plot(20*np.log10(np.abs(SignalSpectrum)))
+            plt.show()
             max_index = np.argmax(SignalSpectrum)  # Find the index of the maximum value
-            Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
+            # Delta_f = (1/4) * f[max_index]  # Calculate the frequency offset
+
+            Delta_f = f[max_index] #Only use For Tues 20/5 Results
 
             k = np.arange(len(y[0]))
             z0 = y[0]*np.exp(-1j*2*np.pi*Delta_f*Ts*k)
@@ -2131,10 +2136,10 @@ def align_symbols_1Pol(source, processed, demodulated, demod_bits, original_bits
     # Find peak index for time shift
     time_shift = np.argmax(autocorr)
 
-    plt.figure()
-    plt.plot(autocorr)
-    print(time_shift)
-    plt.show()
+    # plt.figure()
+    # plt.plot(autocorr)
+    # print(time_shift)
+    # plt.show()
     
     # Correct cyclic shift
     if time_shift > N // 2:

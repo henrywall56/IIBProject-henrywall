@@ -92,12 +92,14 @@ class PAS_paramX:
         self.λ = λ
         self.blocks = Mod_param.num_symbols//self.N+1 #Make sure produce more samples than num_symbols
         self.sigma = 0
-        self.PAS_normalisation = 8.41777777777778 #Need to change if using different Modbits or λ
+        # self.PAS_normalisation = 8.41777777777778 #Need to change if using different Modbits or λ
+        # self.PAS_normalisation = 32.69230769230769
+        self.PAS_normalisation = 62.54644808743169 
         
 ############################# SETUP PARAMETERS #############################
 
 Mod_param = Modulation_paramX(
-        Modbits = 4,
+        Modbits = 8,
         Rs = 50e9,
         NPol = 2,
         num_power = 17
@@ -113,7 +115,7 @@ fibre_param = fibre_paramX(
         L=100*1e3, 
         D=17, 
         Clambda=1550/1e9,
-        snr_db = 17 #per symbol
+        snr_db = 23 #per symbol
 )
 
 IQ_Mod_param = IQ_Mod_paramX(
@@ -133,13 +135,13 @@ toggle = toggleX(
         toggle_BPS = True,
         toggle_DE = False,
         toggle_freqoffset = False,
-        toggle_frequencyrecovery = True,
+        toggle_frequencyrecovery = False,
         toggle_CD = False,
         toggle_NL = False,
         toggle_CD_compensation = False,
         toggle_AIR = True,
-        toggle_adaptive_equalisation = True,    
-        toggle_real_adaptive_equalisation = True,
+        toggle_adaptive_equalisation = False,    
+        toggle_real_adaptive_equalisation = False,
         toggle_PAS = True,
         AIR_type = 'MI'
 )
@@ -173,8 +175,6 @@ AE_param = AE_paramX(
         mu_real = 1e-3
 )
 
-
-
 BPS_param = BPS_paramX(
         B = 64,
         N = 20
@@ -182,9 +182,9 @@ BPS_param = BPS_paramX(
 
 PAS_param = PAS_paramX(
         Mod_param.Modbits,
-        λ = 0.05
-        #0, 0.01, 0.025, 0.05, 0.0625, 0.075, 0.08, 0.1, 0.15 for 16QAM 
-        #0.01, 0.015, 0.02, 0.025, 0.03125, 0.034375, 0.0375, 0.05, 0.1 for 64QAM
+        λ = 0.0075
+        #0, 0.01, 0.02, 0.0225, 0.025, 0.03, 0.03125, 0.05, 0.0625, 0.075, 0.08, 0.1, 0.15 for 16QAM 
+        #0.01, 0.015, 0.0175, 0.02, 0.025, 0.03125, 0.034375, 0.0375, 0.05, 0.1 for 64QAM
         #0.015 for 256QAM
 )
 
@@ -192,4 +192,6 @@ lab_testing = False #If True, then lab_testing.py set to save bits and source sy
                     #If True, then transceiver loads in real channel output data
 save_run = False
 
-run = "PCS_16QAM"
+# run = "PCS_16QAM_Tue_20250520_1055"
+# run = "PCS_64QAM_Tue_20250520_1056"
+run = "PCS_256QAM_Tue_20250520_1058"
